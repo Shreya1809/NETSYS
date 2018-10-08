@@ -66,15 +66,8 @@ int FileExists(const char* path)
 void send_response(int flag,http_response_t Response,int new_socket)
 {
 
-	if( flag == 1)
-	{
-		//error 
-		Sendbuf = "\r\n\r\n" + Response.ver + " " + Response.status_code + " "+ Response.status_mesg;
-		//cout << Sendbuf << endl;
-		send(new_socket , Sendbuf.c_str() , Sendbuf.size(), 0 );
-
-	}
-	else if(flag == 2)
+	
+	 if(flag == 2)
 	{
 		//file exists
 		Sendbuf = Response.ver + " " + Response.status_code + " " + Response.status_mesg + "\r\nContent-Type: " + Response.content_type 
@@ -87,14 +80,14 @@ void send_response(int flag,http_response_t Response,int new_socket)
 void  RequestServiceHandler(int new_socket,string HTTP_req)
 {
 	vector<string> res = splitStrings(HTTP_req, dl); 
-	printf("In request service handler.................\n");
+	//printf("In request service handler.................\n");
 	cout << "Method :"<< res[0] << endl; 
 	cout << "URI :" << res[1] << endl; 
 	cout << "Version :" << res[2] << endl;  
 	Request.method = res[0];
 	Request.URI = res[1];
 	Request.version = res[2];
-	printf("Before method.............\n");
+	//printf("Before method.............\n");
 	if (Request.URI == "/")
 	{
 		Request.URI = "/index.html";
@@ -151,10 +144,17 @@ void  RequestServiceHandler(int new_socket,string HTTP_req)
 		else 
 		{
 			cout << "file does not exist at path " << Request.URI.c_str() << endl;
+			ifstream myFile("root/error.html");
+			std::stringstream buffer;
+			buffer << myFile.rdbuf();
 			Response.ver = Request.version;
-			Response.status_code = "404";
-			Response.status_mesg = "NOT_FOUND";
-			send_response(1,Response,new_socket);
+			Response.status_code = "500";
+			Response.status_mesg = "Internal Server Error";
+			Response.content_length = "93";
+			Response.content_type = "html";
+			Response.file_content = buffer.str();
+			//cout << "error.html" << buffer.str() << endl;
+			send_response(2,Response,new_socket);
 		}
 	}	
     else if((Request.method.compare("POST")) == 0)
