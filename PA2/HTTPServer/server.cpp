@@ -77,7 +77,7 @@ int main(int argc, char const *argv[])
         }   
         //wait for an activity on one of the sockets , timeout is NULL ,  
         //so wait indefinitely  
-        activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);   
+NEW:        activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);   
        
         if ((activity < 0) && (errno!=EINTR))   
         {   
@@ -115,20 +115,28 @@ int main(int argc, char const *argv[])
                  
             if (FD_ISSET( sd , &readfds))   
             {    
-                if((valread = read( new_socket ,http_req, sizeof(http_req))) == 0)
+    RETRY:      if((valread = read( new_socket ,http_req, sizeof(http_req))) == 0)
                 {
                     //printf("retry\n");
                     //Somebody disconnected , get his details and print  
                     getpeername(sd , (struct sockaddr*)&client_address ,(socklen_t*)&addrlen);   
                     printf("Host disconnected , ip %s , port %d \n" ,  inet_ntoa(client_address.sin_addr) , ntohs(client_address.sin_port));   
-                        
+                          
                 //Close the socket and mark as 0 in list for reuse  
                 close( sd );   
                 client_socket[i] = 0;
+                goto RETRY;
                 }
-            
+                //host disconnected throws a segmentation error. How to handle this?
                 printf("%s\n",http_req );
-                RequestServiceHandler(new_socket, string(http_req));
+                if (sizeof(http_req) >1)
+                {
+                     RequestServiceHandler(new_socket, string(http_req));
+                }
+                else {
+                    printf("No connection.. Retry\n");
+                    goto NEW;
+                }
                 //close(new_socket);
                 
             }

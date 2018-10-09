@@ -45,6 +45,8 @@ typedef struct
     string method;
     string URI;
     string version;
+    string postdata;
+    string connection;
 }http_request_t;
 
 typedef struct
