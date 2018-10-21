@@ -21,7 +21,7 @@ distclean:
 	-rm -f *.o *.d
 
 %.o: %.cpp
-	$(CC) -c -o $@ $< $(CFLAGS)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 server: $(CPPOBJS)
-	$(CC) $(CFLAGS) $? -o $@ $(CPPLIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(CPPLIBS)

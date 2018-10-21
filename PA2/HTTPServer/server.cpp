@@ -15,6 +15,9 @@ int main(int argc, char const *argv[])
     char dl = ' '; //delimiter for parsing string
     char http_req[1024] = {0};   
 
+    struct timeval timeout;
+    timeout.tv_sec = 10.0;
+    timeout.tv_usec = 0.0;
     //set of socket descriptors  
     fd_set readfds;   
 
@@ -77,13 +80,22 @@ int main(int argc, char const *argv[])
         }   
         //wait for an activity on one of the sockets , timeout is NULL ,  
         //so wait indefinitely  
-NEW:        activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);   
+NEW:        
+        activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);   
        
         if ((activity < 0) && (errno!=EINTR))   
         {   
-            printf("select error");   
+            printf("select error");  
+            close(max_sd); 
+            return 0;
         }   
-
+        /*else if(activity == 0)
+        {
+            printf("Timeout occured. No request received for 10 secs on the socket\n");
+            close(max_sd);
+            return 0;
+        }*/
+        //If something happened on the master socket , then its an incoming connection  
         if (FD_ISSET(master_socket, &readfds))   
         {   
            
@@ -109,36 +121,52 @@ NEW:        activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);
             } 
         }
         //else its some IO operation on some other socket 
-        for (i = 0; i < max_clients; i++)   
-        {   
-            sd = client_socket[i];   
-                 
-            if (FD_ISSET( sd , &readfds))   
-            {    
-    RETRY:      if((valread = read( new_socket ,http_req, sizeof(http_req))) == 0)
-                {
-                    //printf("retry\n");
-                    //Somebody disconnected , get his details and print  
-                    getpeername(sd , (struct sockaddr*)&client_address ,(socklen_t*)&addrlen);   
-                    printf("Host disconnected , ip %s , port %d \n" ,  inet_ntoa(client_address.sin_addr) , ntohs(client_address.sin_port));   
-                          
-                //Close the socket and mark as 0 in list for reuse  
-                close( sd );   
-                client_socket[i] = 0;
-                goto RETRY;
-                }
-                //host disconnected throws a segmentation error. How to handle this?
-                printf("%s\n",http_req );
-                if (sizeof(http_req) >1)
-                {
-                     RequestServiceHandler(new_socket, string(http_req));
-                }
-                else {
-                    printf("No connection.. Retry\n");
-                    goto NEW;
-                }
-                //close(new_socket);
+        else
+        {
+            for (i = 0; (i < max_clients) && (client_socket[i] > 0); i++)   
+            {   
+                sd = client_socket[i];   
+                    
+                if (FD_ISSET( sd , &readfds))   
+                {    
+                    if((valread = read( new_socket ,http_req, sizeof(http_req))) == 0)
+                    {
+                        //printf("retry\n");
+                        //Somebody disconnected , get his details and print  
+                        getpeername(sd , (struct sockaddr*)&client_address ,(socklen_t*)&addrlen);   
+                        printf("Host disconnected , ip %s , port %d \n" ,  inet_ntoa(client_address.sin_addr) , ntohs(client_address.sin_port));   
+                                
+                        //Close the socket and mark as 0 in list for reuse  
+                        close( sd );   
+                        printf("Socket %d closed -sd\n",sd);
+                        //printf("Socket %d closed - new socket\n",new_socket);
+                        client_socket[i] = 0;
                 
+                    }
+                    //host disconnected throws a segmentation error. How to handle this?
+                    //printf("size of http_req %d\n",sizeof(http_req) );
+                    else if (sizeof(http_req) < 30)
+                    {
+                        printf("No connection.. Retry\n");
+                        goto NEW;
+                            
+                    }
+                    else {
+                        printf("Req chars\n");
+                        for(int i = 0; i < valread; i++)
+                        {
+                            printf("%c",http_req[i]);
+                        }
+                        //printf("\n\n");
+                        //printf("http_req: %s\n  length:%d\n Valread:%d\n",http_req ,strlen(http_req),valread);
+                        //string str(http_req,valread);
+                        //printf("str:%u\n",str.length());
+                        RequestServiceHandler(new_socket, string(http_req));
+                        
+                    }
+                    //close(new_socket);
+                    
+                }
             }
         }
     }
