@@ -15,18 +15,7 @@ string extension;
 ifstream myFile;
 int pipelineflag = 0;
 
-struct timeval timeout;
-void timelimit(int sockfd)
-{
-timeout.tv_sec = 10.0;
-timeout.tv_usec = 0.0;
-    
-	if (setsockopt (sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
-	{
-		printf("setsockopt for timeout-output failed");
-	}
-   
-}
+struct timeval tv = {11, 0};
 
 //struct http_response_t *Response_buf = malloc(sizeof( struct http_response_t));
 vector<string> splitStrings(string str, char dl) //REFERENCE - https://www.geeksforgeeks.org/split-string-substrings-using-delimiter/
@@ -79,13 +68,46 @@ int FileExists(const char* path)
         return 1;
 }
 
-void send_response(http_response_t Response,int new_socket)
+void send_response(http_response_t Response,int new_socket, int nfds)
 {
 	//for GET and POST
 	Sendbuf = Response.ver + " " + Response.status_code + " " + Response.status_mesg + "\r\nContent-Type: " + Response.content_type 
 			+ "\r\nContent-Length: "+ Response.content_length + "\r\n\r\n" + Response.file_content;
 	send(new_socket , Sendbuf.c_str() , Sendbuf.size(), 0 );
-	
+	if (Request.connection == "Keep-alive")
+	{
+		tv.tv_sec = 11;
+		tv.tv_usec = 0;
+
+		cout<<"in send response keep-alive"<<endl;
+		fd_set fd;
+		FD_ZERO(&fd);
+		FD_SET(nfds, &fd);
+		int n = nfds+1;
+		int ret=0; 
+		printf("\nTimer for piplining started... \n");
+		ret = select(n,&fd,NULL, NULL, &tv); 
+		if(ret == 0)			
+		{
+			printf("\nPipeline request not within timeout...close socket %d\n", nfds);        
+			close(nfds);
+			return;
+		}
+		if(ret == -1)
+		{
+			perror("select failed");
+		}
+		else
+		{          
+
+			printf("\nPipeline request received within timeout....\n");
+			if(FD_ISSET(nfds,&fd))
+			{
+				//nothing
+			}		
+		}
+	}
+	else cout<<"in send response close"<<endl;
 }
 void logVec(vector<string> vec)
 {
@@ -93,9 +115,10 @@ void logVec(vector<string> vec)
 		cout<<vec[i]<<endl;
 }
 
-void  RequestServiceHandler(int new_socket,string HTTP_req)
+void  RequestServiceHandler(int new_socket,string HTTP_req, int nfds)
 {
 	//parsing the string to get components -method,url and version
+	
 	vector<string> res = splitStrings(HTTP_req, dl); 
 	//cout << "vector size: "<<HTTP_req<<endl;
 	logVec(res);
@@ -110,28 +133,21 @@ void  RequestServiceHandler(int new_socket,string HTTP_req)
 	Request.method = res[0];
 	Request.URI = res[1];
 	cout<<"size of res :"<<res.size()<<endl;
-	//cout<<"res[0] : "<<res[0];
-	//cout<<"  res[1] :"<<res[1];
-	//cout<<"  res[2] :"<<res[2];
-	
 	
 	if(res[0]== "POST") //handling for POST -extra components in the request
 	{
 		vector<string> res_1 = splitStrings(res[2], '\\'); //parsing substring to get version for POST
 		Request.version = res_1[0];
-		//vector<string> res_2 = splitStrings(res[4], '\\');//parsing substring to get connection and post data
-		//Request.connection = res_2[0];
-		//Request.postdata = res_2[4].erase(0,1);
+		
 		cout<<"V:"<<Request.version<<endl;
-		cout<<"size of res :"<<res.size()<<endl;
-		cout<<"res[4] : "<<res[4];
-		cout<<"  res[5] :"<<res[5];
-		cout<<"  res[6] :"<<res[6];
-		cout<<"  res[7] :"<<res[7];
-		cout<<"  res[8] :"<<res[8];
-		
-		
+		cout<<"size of res :"<<res.size()<<endl;		
 		Request.postdata = res[8].erase(0,1);
+		//cout<<"POSTDATA: "<<res[8].erase(0,1)<<endl;
+		res[8].clear();
+		//cout<<"after clearing res[8] :" <<res[8]<<endl;
+		
+
+		
 		
 	}
 	else{
@@ -144,18 +160,7 @@ void  RequestServiceHandler(int new_socket,string HTTP_req)
 		cout<<"invalid version"<< endl;
 			exit(1);
 	}
-	/*if(Request.version != "HTTP/1.1\n" && Request.version != "HTTP/1.0" ) //error handling for version
-	{
-		vector<string> res_3 = splitStrings(Request.version, '\\');
-		if(res_3[0]!="HTTP/1.1" && res_3[0]!="HTTP/1.0")
-		{
-			cout<< "version :" << Request.version << endl;
-			cout<<"invalid version"<< endl;
-			exit(1);
-		}
-		Request.version = res_3[0];
-		
-	}*/
+	
 	if (Request.URI == "/") //default index page if no URL
 	{
 		Request.URI = "/index.html";
@@ -166,7 +171,7 @@ void  RequestServiceHandler(int new_socket,string HTTP_req)
 		path.clear();
 		std::streampos begin = 0, end = 0, diff = 0;
 		path = "root" + Request.URI; //appending root to the path as all files are in root folder
-		//cout << "path: " << path <<endl;
+		
 		//to check if the given file exits
 		if (FileExists(path.c_str())== 1)
 		{
@@ -206,48 +211,35 @@ void  RequestServiceHandler(int new_socket,string HTTP_req)
 			{
 				Response.file_content = buffer.str();
 				Response.content_length =to_string(diff);
-				
-				//vector<string> res_4 = splitStrings(res[4], '\\');//parsing substring to get connection and post data
-				//Request.connection = res_4[2];
-				//cout<<"Request Connection type :"<<Request.connection<<endl;
-				/*if(res.size()>3)
-				{
-					if((Request.connection.compare("Keepalive") == 0) || (Request.connection.compare("Keep-alive") ==0) )
-					{	
-						
-						int i = 0;
-						while(res[i].size() > 1)
-						{
-							//cout << res[i+4]<< " index is " <<i <<endl;
-							//i=i+4;
-							i++;
-						}
-						cout << "no of substrings " << i <<endl;
-						//printf("inside keepalive\n");
+				//to check for connections
+				 if (res[6].size())
+				 {
+					 cout<<"res[6] :" <<res[6]<<endl;
+					 if(res[6]=="Keep-alive")
+					 {
+						cout<<"The connection is keep-alive :"<<endl;
+						Request.connection = res[6];
 						Response.content_length = to_string(diff) + "\r\nConnection: Keep-alive";
-						//pipelineflag = 1;
-					}
-					else 
-					{
-						cout<<"connection is close"<<endl;
-						Response.content_length = to_string(diff) + "\r\nConnection: Close";
-					}
-				}
-				else
-				{
-					Response.file_content = buffer.str();
-					Response.content_length =to_string(diff);
-				}*/
+						
+					 }
+					 else{
+						 Request.connection = "0";
+						 Response.content_length = to_string(diff) + "\r\nConnection: Close";
+					 }
+					 send_response(Response,new_socket,nfds); //function to send data over socket
+				 }
+				
 			}
 			else if(Request.method == "POST") //POST
 			{
-				cout<<"Request Postdata:" <<Request.postdata;
-				cout<<"After request postdata"<<endl;
+				cout<<"Request Postdata:" <<Request.postdata<<endl;
+				//cout<<"After request postdata"<<endl;
 				Response.file_content = "<html><body><pre><h1>" + Request.postdata + "</h1></pre>" + buffer.str(); //file content fot POST along eith POST header 
 				if((Request.connection.compare("Keepalive") == 0) || (Request.connection.compare("Keep-alive") ==0) )
 				{
 					cout<<"Server NOT closing connection"<<endl;
 					Response.content_length = to_string(Response.file_content.size()) + "\r\nConnection: Keep-alive";
+					
 				}
 				else
 				{
@@ -261,7 +253,7 @@ void  RequestServiceHandler(int new_socket,string HTTP_req)
 				exit(1);
 			}
 
-			send_response(Response,new_socket); //function to send data over socket
+			send_response(Response,new_socket,nfds); //function to send data over socket
 			
 		}
 		else 
@@ -279,9 +271,9 @@ void  RequestServiceHandler(int new_socket,string HTTP_req)
 			Response.content_type = "html";
 			Response.file_content = buffer.str();
 			//cout << "error.html" << buffer.str() << endl;
-			send_response(Response,new_socket);
+			send_response(Response,new_socket,nfds);
 		}
 	}	
-
+	
 }
 

@@ -1,0 +1,44 @@
+
+Objective:
+To create a HTTP-based web server that handles multiple simultaneous requests from users.
+
+Language:
+The language used for the code is a mixture of c and c++. C++ string class has been used for parsing the string.
+
+Execution instructions:
+1. To check the main goal
+a. Clean the server using the command "make clean"
+b. Make the server using the command "make"
+c. Then run the server uing the command "./server 8888
+d. to check with nc type the following into ther terminal :(echo -en "GET /index.html HTTP/1.1") | nc 127.0.0.1 8888
+e. to check with the browser enter the following to display the index page :http://localhost:8888/index.html or simply http://localhost:8888/
+
+2. To check POST functionality (extra credit)
+a. to check with nc, run the server first then type the following into terminal: 
+(echo -en "POST /index.html HTTP/1.1\r\nHost: localhost\r\nConnection: Keepalive\r\n\r\nPOSTDATA")
+| nc 127.0.0.1 8888
+
+3. To check pipelining functionality (extra credit)
+a. to check with nc, run the server first then type the following into the terminal:
+(echo -en "GET /index.html HTTP/1.1\r\nHost: localhost\r\nConnection: Keep-alive\r\n\r\n"; sleep 10; echo
+-en "GET /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n") | nc 127.0.0.1 8888
+
+Error Handling
+In case the file trying to access is not in the root folder then the browser will send an error.html file also inside the root folder. This
+basically displays an error message "HTTP/1.1 500 Internal Server Error"
+
+Contents of folder
+The HTTPServer folder contains 
+1. library.cpp: It contains all the string parsing functions and string rearragement to send over to the client/browser/nc/telnet.
+2. server.cpp: It contains all the basic web socket connection APIs to establish a connection and sends incoming command into a function
+called RequestServiceHandler() which is available in library.cpp
+3. root: contains all the files to send and check with, given by the professor
+4. Makefile:To make the server
+5. includes:All the #includes needed for socket programming which is common across different files
+
+References:
+1. https://www.geeksforgeeks.org/socket-programming-cc/
+2. https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
+3. www.stackoverflow.com
+
+This is my own work. Any resemblance to anything other than the refernces cites above is purely coincidental.

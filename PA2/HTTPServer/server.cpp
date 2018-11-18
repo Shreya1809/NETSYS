@@ -15,9 +15,7 @@ int main(int argc, char const *argv[])
     char dl = ' '; //delimiter for parsing string
     char http_req[1024] = {0};   
 
-    struct timeval timeout;
-    timeout.tv_sec = 10.0;
-    timeout.tv_usec = 0.0;
+    
     //set of socket descriptors  
     fd_set readfds;   
 
@@ -78,23 +76,17 @@ int main(int argc, char const *argv[])
             if(sd > max_sd)   
                 max_sd = sd;   
         }   
-        //wait for an activity on one of the sockets , timeout is NULL ,  
-        //so wait indefinitely  
-NEW:        
+        //wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely  
+NEW:    // uncomment the select with timeout for pipelining   
         activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);   
-       
+        //activity = select( max_sd + 1 , &readfds , NULL , NULL , &tv);
         if ((activity < 0) && (errno!=EINTR))   
         {   
             printf("select error");  
             close(max_sd); 
             return 0;
         }   
-        /*else if(activity == 0)
-        {
-            printf("Timeout occured. No request received for 10 secs on the socket\n");
-            close(max_sd);
-            return 0;
-        }*/
+       
         //If something happened on the master socket , then its an incoming connection  
         if (FD_ISSET(master_socket, &readfds))   
         {   
@@ -157,11 +149,8 @@ NEW:
                         {
                             printf("%c",http_req[i]);
                         }
-                        //printf("\n\n");
-                        //printf("http_req: %s\n  length:%d\n Valread:%d\n",http_req ,strlen(http_req),valread);
-                        //string str(http_req,valread);
-                        //printf("str:%u\n",str.length());
-                        RequestServiceHandler(new_socket, string(http_req));
+                        
+                        RequestServiceHandler(new_socket, string(http_req),max_sd);
                         
                     }
                     //close(new_socket);
