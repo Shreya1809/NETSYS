@@ -4,7 +4,7 @@ CC=g++
 
 CDEFS=
 CFLAGS= $(INCLUDE_DIRS) $(CDEFS) -O0 -std=c++11 #-g
-CPPLIBS= -lpthread 
+CPPLIBS= -lpthread -lcrypto
 
 CPPSRCS= library.cpp proxy.cpp
 

@@ -5,14 +5,19 @@
 #include <unordered_map>
 #include <list>
 #include <algorithm>
+#include <openssl/md5.h>
+#include <time.h>
 
 using namespace std;
 
 const char dl = ' ';
 
+
 unordered_map<string,string> URLCache;
-unordered_map<long,PAGE_CACHE_T> PageCache;
+unordered_map<string,PAGE_CACHE_T> PageCache;
 list<string> ForbiddenSiteList;
+
+
 
 void populateForbiddenMap(string filename)
 {
@@ -50,7 +55,17 @@ bool checkIfSiteForbidden(string hostname)
 	return binary_search(ForbiddenSiteList.begin(), ForbiddenSiteList.end(), hostname);
 }
 
-
+bool check_key(unordered_map<string, PAGE_CACHE_T> PageCache, string md5sum, PAGE_CACHE_T *page) 
+{ 
+    // Key is not present 
+    if (PageCache.find(md5sum) == PageCache.end()) {
+        return false;  //not present
+	}
+	else{
+		*page = PageCache[md5sum];
+		return true;  //present
+	}
+}
 vector<string> splitStrings(string str, char dl) //REFERENCE - https://www.geeksforgeeks.org/split-string-substrings-using-delimiter/
 { 
 	string word = ""; 
@@ -199,7 +214,7 @@ int error_handler(int socket_client, http_request_t Request, http_response_t Res
 	
 	if ((methoderror == 0) && (versionerror == 0)&& (urlerror == 0))
 	{
-		cout<< "No Error. Proceeding to parsing..." << endl;
+		cout<< "LOG INFO:No Error. Proceeding to parsing..." << endl;
 		return 0;
 	}
 	else 
@@ -225,11 +240,7 @@ int error_handler(int socket_client, http_request_t Request, http_response_t Res
 		{
 			printf("Invalid method CONNECT\n");
 			return 1;
-		}
-		 
-		
-		
-		
+		}	
 	}
 	
 }
@@ -286,35 +297,36 @@ int parse_request(http_request_t *Request, url_parse_t *parse)
         parse->portnum = "80";
         cout << "hostname :" << parse->hostname <<endl;
     }
-	cout << "Parsing Complete. Proceeding to reconstructing HTTP request..." << endl;
+	cout << "LOG INFO:Parsing Complete. Proceeding to reconstructing HTTP request..." << endl;
 	//cout << "parse pathname: "<<parse.pathname << endl;
 	return 0;
 }
 
 
-int reconstruct_request(http_request_t Request, http_server_request_t ServerRequest, url_parse_t parse, http_response_t Response, int client_socket)
+int reconstruct_request(http_request_t Request, http_server_request_t ServerRequest, url_parse_t parse, http_response_t Response, int client_socket, int timeout)
 {
 	struct hostent *host_entry; 
 	char hostbuffer[256];
 	const char *IPbuffer; 
 	string Send_reqbuff;
 	sscanf(Request.URL, "%*[^/]%*[/]%[^/]",hostbuffer);
-
-	
+	printf("------------Hostname-IP Cache list Contents as follows------------\n");
+	printCache<string,string>(URLCache);
+	printf("---------------End of Hostname-IP Cache list Contents-------------\n");
 	auto itr = URLCache.find(string(hostbuffer)); //check hostname-ip cache
 	if(itr != URLCache.end()){
-		printf("-------IP fetched from cache\n");
+		printf("------------IP fetched from cache------------------\n");
 		IPbuffer = itr->second.c_str();
 	}
 	else{
 		host_entry = gethostbyname(hostbuffer);
 		IPbuffer = inet_ntoa(*((struct in_addr*) host_entry->h_addr_list[0]));
 		URLCache[string(hostbuffer)] = string(IPbuffer); 
-		printf("-------IP not found. IP added to cache\n");
+		printf("-------------IP not found. IP added to cache--------------\n");
 	}
+
 	ServerRequest.server_method = Request.method;
 	ServerRequest.server_uri = parse.pathname;
-	
 	ServerRequest.server_version = Request.version;
 	
 	
@@ -324,10 +336,10 @@ int reconstruct_request(http_request_t Request, http_server_request_t ServerRequ
 	//Send_reqbuff ="GET / HTTP/1.1\r\nHost: neverssl.com\r\nConnection: close\r\n\r\n";
 	//printf("Server Req: %s\n",Send_reqbuff);
 	cout<< "Server Req constructed :" << Send_reqbuff << endl;
-	server_side_handler(client_socket,Send_reqbuff,IPbuffer,parse);
+	server_side_handler(client_socket,Send_reqbuff,IPbuffer,parse,timeout);
 }
 
-int server_side_handler(int client_socket,string Send_reqbuff,const char *IPbuffer,url_parse_t parse)
+int server_side_handler(int client_socket,string Send_reqbuff,const char *IPbuffer,url_parse_t parse,int timeout)
 {
 	struct sockaddr_in address; 
     int sock = 0, valread, valsend; 
@@ -335,89 +347,138 @@ int server_side_handler(int client_socket,string Send_reqbuff,const char *IPbuff
     char buffer[1024] = {0}; 
 	char copybuffer[1024] = {0}; 
 	char c;
+	char mdString[33];
+	bool check_ret;
+	static int fileno = 0;
 	FILE *fp,*fp1;
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
-    { 
-        printf("\n Socket creation error \n"); 
-        return -1; 
-    } 
-   
-    memset(&serv_addr, '0', sizeof(serv_addr)); 
-  //cout << "port : " << parse.portnum << endl;
-    serv_addr.sin_family = AF_INET; 
-    serv_addr.sin_port = htons(stoi(parse.portnum)); 
-       
-    // Convert IPv4 and IPv6 addresses from text to binary form 
-    if(inet_pton(AF_INET, IPbuffer , &serv_addr.sin_addr)<=0)  
-    { 
-        printf("\nInvalid address/ Address not supported \n"); 
-        return -1; 
-    } 
-   
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) 
-    { 
-        printf("\nConnection Failed \n"); 
-        return -1; 
-    } 
-	// std::string str("GET http://"+ string(IPbuffer)+"/ HTTP/1.0 \r\n\r\n");
-	//std::string str("GET / HTTP/1.0 \r\n\r\n");
-	
-    valsend = send(sock , Send_reqbuff.c_str() , Send_reqbuff.size() , 0 );
-	int headersize = 0 , flag = 0;
-	size_t bytesread = 0; 
-	string filename = "pages/page";
+	int flag = 0;
+	size_t bytesread = 0, cachebytes = 0; 
+	string filename = "page_cache/";
 	string ext = ".html";
-	/*fp = fopen( string(filename+to_string(client_socket)+ext).c_str() , "w" );
-	if(fp == NULL)
+	PAGE_CACHE_T page;
+	
+	unsigned char digest[16];
+	MD5_CTX ctx;
+    MD5_Init(&ctx);
+    MD5_Update(&ctx, string(parse.hostname + parse.pathname).c_str(), parse.hostname.length() + parse.pathname.length());
+    MD5_Final(digest, &ctx);
+
+    for (int i = 0; i < 16; i++)
 	{
-		printf("ERROR open FILE\n");
-		exit(0);
-	}*/
-	char *ret = NULL;
+        sprintf(&mdString[i*2], "%02x", (unsigned int)digest[i]);
+	}
+ 
+    printf("md5 digest: %s\n", mdString);
+
+	check_ret = check_key(PageCache,mdString, &page);
+	time_t curr_time = time(NULL);
+	if (check_ret && ((curr_time - page.time)< timeout)) //present and time less than 60 seconds
+	{
+		printf("-----------The page is available in cache and has not expired-------------\n");
+		printf("-------------Fetching cached page--------------\n");
+		
+		//string nameoffile = filename + to_string(fileno) + ext;
+		fp = fopen(page.filepath.c_str(), "r" );
+		//add to the unordered map
+		//PAGE_CACHE_T p = {.filepath = "filepath.html", .time = 1600};
+		//PageCache[mdString] = p; 
+		// fread and send
+		flag = 1;
+
+	}
+	else if (check_ret && ((curr_time - page.time) >= timeout))
+	{
+		printf("--------------Page has Expired--------------\n");
+		printf("-------------Fetching New Page--------------\n");
+		remove(page.filepath.c_str());
+		flag = 0;
+		goto AGAIN;
+	}
+	else{ // not present
+		
+		printf("-------------Page Not In Cache---------------\n");
+		flag = 0;
+
+AGAIN:	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
+		{ 
+			printf("\n Socket creation error \n"); 
+			return -1; 
+		} 
+	
+		memset(&serv_addr, '0', sizeof(serv_addr)); 
+		serv_addr.sin_family = AF_INET; 
+		serv_addr.sin_port = htons(stoi(parse.portnum)); 
+		
+		// Convert IPv4 and IPv6 addresses from text to binary form 
+		if(inet_pton(AF_INET, IPbuffer , &serv_addr.sin_addr)<=0)  
+		{ 
+			printf("\nInvalid address/ Address not supported \n"); 
+			return -1; 
+		} 
+	
+		if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) 
+		{ 
+			printf("\nConnection Failed \n"); 
+			return -1; 
+		} 
+		// std::string str("GET http://"+ string(IPbuffer)+"/ HTTP/1.0 \r\n\r\n");
+		//std::string str("GET / HTTP/1.0 \r\n\r\n");
+		
+		valsend = send(sock , Send_reqbuff.c_str() , Send_reqbuff.size() , 0 ); //sending the request to main server
+		
+		string nameoffile = filename + to_string(fileno) + ext;
+		fp = fopen( nameoffile.c_str(), "w" );
+		//add to the unordered map
+		printf("-----------Adding Page to Cache-------------\n");
+		PAGE_CACHE_T p = {.filepath = nameoffile, .time = time(NULL)};
+		PageCache[mdString] = p; 
+		
+		fileno++;
+		//cout << nameoffile << endl;
+
+		if(fp == NULL)
+		{
+			printf("ERROR open FILE\n");
+			exit(0);
+		}
+		printf("------------PAGE Cache list Contents as follows------------\n");
+		printCache<string,PAGE_CACHE_T>(PageCache);
+		printf("---------------End of PAGE Cache list Contents-------------\n");
+	}
+
 	while(1)
 	{
 		bzero(buffer,1024);
-    	valread = read(sock , buffer, 1024); 
-		//else flag = 0;
-		//printf("--valread: %d\n", valread);
-		//if(valread == 0) break;
-		//if(valread > 0 ){
-		if (valread > 0) {
-			bytesread = bytesread + valread;
-			//printf("%s\n",buffer );
-			/*if((ret = strcasestr(buffer,"<!DOCTYPE html>"))!= NULL)
-			{
-				headersize = ret - buffer;
-				//memcpy(copybuffer,buffer,headersize);
-				cout<<"the size of the header : " << ret - buffer << endl;
-				flag = 1;
+		if (flag == 0)//not in cache
+		{
+    		valread = read(sock , buffer, 1024); 
+			if (valread > 0) {
+				bytesread = bytesread + valread;
+				valsend = send(client_socket,buffer,valread, 0);
+				fwrite(buffer,1, valread,fp);
 			}
-			bytesread = bytesread + valread;
-			if (1 ||flag == 1)
-			{
-				//printf("Writing to file/n");
-				headersize = 0;
-				fwrite(buffer+headersize , 1 , valread-headersize, fp );
-				headersize = 0;
-			}*/
-			//send(client_socket,buffer,valread-1, 0);
-			send(client_socket,buffer,valread, 0);
-			//cout<<"bytesread: " << bytesread <<endl;
-			//if(/*buffer[valread-2] == '\r' && */buffer[valread-1] == '\n')
-			//	break;
+			else
+				break;
 		}
-		else
-			break;
+		else //in cache
+		{
+			//fread and send
+			size_t nbytes = 0;
+			if( (nbytes = fread(buffer, 1, 1024, fp)) > 0)
+			{
+				cachebytes = cachebytes + nbytes;
+				valsend = send(client_socket, buffer , nbytes, 0);
+			}
+			else
+				break;
+		}
 
 	}
 	close(sock);
-	//fclose(fp);  
-	cout<<"Total bytesread: " << bytesread << endl;
-	//cout<<"The size of the header : " << headersize << endl;
-	//printf("%s\n", copybuffer);
-	//printf("bytes read = %d\n",valread);
-  	//printf("%s\n",buffer ); 
-	//send(client_socket,buffer,strlen(buffer), 0);
+	fclose(fp);  
+	cout<<"Total bytes sent from server: " << bytesread << endl;
+	cout<<"Total bytes sent from cache: "<< cachebytes <<endl;
+	
     return 0; 
 }
 
@@ -429,6 +490,7 @@ ostream& operator<<(ostream &os, const PAGE_CACHE_T &obj){
 template<class X, class Y>
 void printCache(unordered_map<X,Y> &map)
 {
+	//cout<<"--Printing hostname Cache"<<endl;
 	for(auto x: map)
 	{
 		cout<<"Key:"<<x.first<<" Val:"<<x.second<<endl;

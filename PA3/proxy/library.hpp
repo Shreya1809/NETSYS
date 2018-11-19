@@ -8,7 +8,7 @@ using namespace std;
 
 typedef struct pagecache{
 	string filepath;
-	uint32_t time;
+	long int time;
 
 	friend ostream& operator<<(ostream &os, const struct pagecache &obj);
 
@@ -31,6 +31,6 @@ void send_response(http_response_t Response,int new_socket);
 //int FileExists(const char* path);
 int error_handler(int socket_client, http_request_t Request, http_response_t Response);
 int parse_request(http_request_t *Request, url_parse_t *parse);
-int reconstruct_request(http_request_t Request, http_server_request_t ServerRequest, url_parse_t parse, http_response_t Response, int client_socket);
-int server_side_handler(int client_socket,string Send_rebuff,const char *IPbuffer,url_parse_t parse);
+int reconstruct_request(http_request_t Request, http_server_request_t ServerRequest, url_parse_t parse, http_response_t Response, int client_socket,int timeout);
+int server_side_handler(int client_socket,string Send_rebuff,const char *IPbuffer,url_parse_t parse, int timeout);
 #endif

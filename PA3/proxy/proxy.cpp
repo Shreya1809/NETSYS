@@ -11,13 +11,14 @@
 
 #define BACKLOG     10  /* Passed to listen() */
 int cachetimeout = 0;
- 
+ pthread_mutex_t mutexlock;
 
 
 //char c = 'g'; 
 //char c = 'g'; 
 void *handle(void *pnewsock)
 {
+    pthread_mutex_lock(&mutexlock); 
     if(pnewsock == NULL){
         perror("Invalid socket thread param"); 
         exit(EXIT_FAILURE); 
@@ -31,7 +32,7 @@ void *handle(void *pnewsock)
     int retvalue;
     /* send(), recv(), close() */
     //cout<< "entered thread function" << endl;
-    printf("clientsock: %d\n pthread id: %u\n", clientsock, pthread_self());
+    printf("clientsock: %d\n pthread id: %lu\n", clientsock, pthread_self());
 
     memset(buffer, 0, sizeof(buffer));
     int valread = read(clientsock , buffer, 1024); 
@@ -43,14 +44,11 @@ void *handle(void *pnewsock)
     retvalue = error_handler(clientsock,Request,Response);
     if (retvalue == 0)
     {
-        ///printf("\n\nlength of method is %ld and http version length is %ld\n\n", strlen(Request.method), strlen(Request.version));
         parse_request(&Request,&parse);
-        //cout << "parse pathname: "<<parse.pathname << endl;
-        reconstruct_request(Request, ServerRequest, parse, Response, clientsock);
-        //break;
+        reconstruct_request(Request, ServerRequest, parse, Response, clientsock,cachetimeout);
     }
     close(clientsock);
-    
+    pthread_mutex_unlock(&mutexlock);
 }
 
 int main(int argc, char const *argv[]) 
@@ -70,10 +68,15 @@ int main(int argc, char const *argv[])
     } 
     port = atoi(argv[1]);
     cachetimeout = atoi(argv[2]); 
-
+    printf("------------------Blacklist----------------------\n");
     populateForbiddenMap("blacklist.txt"); //add blacklist to the list
-
+    printf("---------------End of Blacklist-------------------\n");
     // Creating socket file descriptor 
+    if (pthread_mutex_init(&mutexlock, NULL) != 0) 
+    { 
+        printf("\n mutex init has failed\n"); 
+        return 1; 
+    } 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) 
     { 
         perror("socket failed"); 
@@ -124,12 +127,14 @@ int main(int argc, char const *argv[])
         }
         else {
             perror("malloc");
+            exit(EXIT_FAILURE);
         }
         
     }
-   
-    //printf("Hello message sent\n"); 
+
+    cout<<"PROXY EXITING"<<endl;
+ 
     close(server_fd);
-    //free(pnewsock);
+   
     return 0; 
 } 
