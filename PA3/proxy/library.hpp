@@ -5,6 +5,8 @@
 #include <string>
 
 using namespace std;
+extern pthread_mutex_t mutexlockpage;
+extern pthread_mutex_t mutexlockurl;
 
 typedef struct pagecache{
 	string filepath;
@@ -17,7 +19,7 @@ typedef struct pagecache{
 ostream& operator<<(ostream &os, const struct pagecache &obj);
 
 template<class X, class Y>
-void printCache(unordered_map<X,Y> &map);
+void printCache(const unordered_map<X,Y> &map);
 
 void populateForbiddenMap(string filename);
 

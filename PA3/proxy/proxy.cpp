@@ -11,14 +11,15 @@
 
 #define BACKLOG     10  /* Passed to listen() */
 int cachetimeout = 0;
- pthread_mutex_t mutexlock;
+pthread_mutex_t mutexlockpage;
+pthread_mutex_t mutexlockurl;
 
 
 //char c = 'g'; 
 //char c = 'g'; 
 void *handle(void *pnewsock)
 {
-    pthread_mutex_lock(&mutexlock); 
+    //pthread_mutex_lock(&mutexlock); 
     if(pnewsock == NULL){
         perror("Invalid socket thread param"); 
         exit(EXIT_FAILURE); 
@@ -36,7 +37,12 @@ void *handle(void *pnewsock)
 
     memset(buffer, 0, sizeof(buffer));
     int valread = read(clientsock , buffer, 1024); 
-    
+    if(valread < 0)
+    {
+        cout<<"Read error"<<__FUNCTION__<<endl;
+        close(clientsock);
+        return (void*)0;
+    }
     printf("%s\n",buffer);
     sscanf(buffer, "%s %s %s", Request.method, Request.URL, Request.version); 
     //send(clientsock , hello , strlen(hello) , 0 ); 
@@ -48,7 +54,8 @@ void *handle(void *pnewsock)
         reconstruct_request(Request, ServerRequest, parse, Response, clientsock,cachetimeout);
     }
     close(clientsock);
-    pthread_mutex_unlock(&mutexlock);
+    //pthread_mutex_unlock(&mutexlock);
+    return (void*)0;
 }
 
 int main(int argc, char const *argv[]) 
@@ -72,7 +79,12 @@ int main(int argc, char const *argv[])
     populateForbiddenMap("blacklist.txt"); //add blacklist to the list
     printf("---------------End of Blacklist-------------------\n");
     // Creating socket file descriptor 
-    if (pthread_mutex_init(&mutexlock, NULL) != 0) 
+    if (pthread_mutex_init(&mutexlockpage, NULL) != 0) 
+    { 
+        printf("\n mutex init has failed\n"); 
+        return 1; 
+    } 
+    if (pthread_mutex_init(&mutexlockurl, NULL) != 0) 
     { 
         printf("\n mutex init has failed\n"); 
         return 1; 

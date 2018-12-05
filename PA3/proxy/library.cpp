@@ -55,7 +55,7 @@ bool checkIfSiteForbidden(string hostname)
 	return binary_search(ForbiddenSiteList.begin(), ForbiddenSiteList.end(), hostname);
 }
 
-bool check_key(unordered_map<string, PAGE_CACHE_T> PageCache, string md5sum, PAGE_CACHE_T *page) 
+bool check_key(unordered_map<string, PAGE_CACHE_T> &PageCache, string md5sum, PAGE_CACHE_T *page) 
 { 
     // Key is not present 
     if (PageCache.find(md5sum) == PageCache.end()) {
@@ -310,19 +310,21 @@ int reconstruct_request(http_request_t Request, http_server_request_t ServerRequ
 	const char *IPbuffer; 
 	string Send_reqbuff;
 	sscanf(Request.URL, "%*[^/]%*[/]%[^/]",hostbuffer);
-	printf("------------Hostname-IP Cache list Contents as follows------------\n");
+	cout<<"------------Hostname-IP Cache list Contents as follows------------\n";
 	printCache<string,string>(URLCache);
-	printf("---------------End of Hostname-IP Cache list Contents-------------\n");
+	cout<<"---------------End of Hostname-IP Cache list Contents-------------\n";
 	auto itr = URLCache.find(string(hostbuffer)); //check hostname-ip cache
 	if(itr != URLCache.end()){
-		printf("------------IP fetched from cache------------------\n");
+		cout<<"------------IP fetched from cache------------------\n";
 		IPbuffer = itr->second.c_str();
 	}
 	else{
 		host_entry = gethostbyname(hostbuffer);
 		IPbuffer = inet_ntoa(*((struct in_addr*) host_entry->h_addr_list[0]));
+		pthread_mutex_lock(&mutexlockurl);
 		URLCache[string(hostbuffer)] = string(IPbuffer); 
-		printf("-------------IP not found. IP added to cache--------------\n");
+		pthread_mutex_unlock(&mutexlockurl);
+		cout<<"-------------IP not found. IP added to cache--------------\n";
 	}
 
 	ServerRequest.server_method = Request.method;
@@ -336,28 +338,29 @@ int reconstruct_request(http_request_t Request, http_server_request_t ServerRequ
 	//Send_reqbuff ="GET / HTTP/1.1\r\nHost: neverssl.com\r\nConnection: close\r\n\r\n";
 	//printf("Server Req: %s\n",Send_reqbuff);
 	cout<< "Server Req constructed :" << Send_reqbuff << endl;
-	server_side_handler(client_socket,Send_reqbuff,IPbuffer,parse,timeout);
+	int reti = server_side_handler(client_socket,Send_reqbuff,IPbuffer,parse,timeout);
+	if(reti < 0){
+		cout<<"Server handler error\n";
+	}
 }
 
 int server_side_handler(int client_socket,string Send_reqbuff,const char *IPbuffer,url_parse_t parse,int timeout)
 {
-	struct sockaddr_in address; 
-    int sock = 0, valread, valsend; 
-    struct sockaddr_in serv_addr;  
-    char buffer[1024] = {0}; 
-	char copybuffer[1024] = {0}; 
-	char c;
+	struct sockaddr_in address = {0}; 
+    int sock = -1, valread = 0, valsend = 0; 
+    struct sockaddr_in serv_addr = {0};  
+    char buffer[1024]; 
 	char mdString[33];
-	bool check_ret;
-	static int fileno = 0;
-	FILE *fp,*fp1;
+	bool check_ret = false;
+	static atomic_uint fileno(0);
+	FILE *fp = NULL;
 	int flag = 0;
 	size_t bytesread = 0, cachebytes = 0; 
 	string filename = "page_cache/";
 	string ext = ".html";
 	PAGE_CACHE_T page;
 	
-	unsigned char digest[16];
+	unsigned char digest[16]= {0};
 	MD5_CTX ctx;
     MD5_Init(&ctx);
     MD5_Update(&ctx, string(parse.hostname + parse.pathname).c_str(), parse.hostname.length() + parse.pathname.length());
@@ -379,27 +382,30 @@ int server_side_handler(int client_socket,string Send_reqbuff,const char *IPbuff
 		
 		//string nameoffile = filename + to_string(fileno) + ext;
 		fp = fopen(page.filepath.c_str(), "r" );
-		//add to the unordered map
-		//PAGE_CACHE_T p = {.filepath = "filepath.html", .time = 1600};
-		//PageCache[mdString] = p; 
-		// fread and send
+		if(fp == NULL)
+		{
+			printf("ERROR open FILE\n");
+			//exit(0);
+			return -1;
+		}
+
 		flag = 1;
 
 	}
-	else if (check_ret && ((curr_time - page.time) >= timeout))
-	{
-		printf("--------------Page has Expired--------------\n");
-		printf("-------------Fetching New Page--------------\n");
-		remove(page.filepath.c_str());
-		flag = 0;
-		goto AGAIN;
-	}
 	else{ // not present
+		if (check_ret && ((curr_time - page.time) >= timeout))
+		{
+			printf("--------------Page has Expired--------------\n");
+			printf("-------------Fetching New Page--------------\n");
+			//remove(page.filepath.c_str());
+		}
+		else{	
+			printf("-------------Page Not In Cache---------------\n");
+		}
 		
-		printf("-------------Page Not In Cache---------------\n");
 		flag = 0;
 
-AGAIN:	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
+		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
 		{ 
 			printf("\n Socket creation error \n"); 
 			return -1; 
@@ -428,57 +434,88 @@ AGAIN:	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 		
 		string nameoffile = filename + to_string(fileno) + ext;
 		fp = fopen( nameoffile.c_str(), "w" );
+		if(fp == NULL)
+		{
+			printf("ERROR open FILE\n");
+			//exit(0);
+			return -1;
+		}
 		//add to the unordered map
 		printf("-----------Adding Page to Cache-------------\n");
 		PAGE_CACHE_T p = {.filepath = nameoffile, .time = time(NULL)};
+		pthread_mutex_lock(&mutexlockpage);
 		PageCache[mdString] = p; 
+		pthread_mutex_unlock(&mutexlockpage);
 		
 		fileno++;
 		//cout << nameoffile << endl;
 
-		if(fp == NULL)
-		{
-			printf("ERROR open FILE\n");
-			exit(0);
-		}
+		
 		printf("------------PAGE Cache list Contents as follows------------\n");
-		printCache<string,PAGE_CACHE_T>(PageCache);
+		//printCache<string,PAGE_CACHE_T>(PageCache);
 		printf("---------------End of PAGE Cache list Contents-------------\n");
 	}
 
 	while(1)
 	{
 		bzero(buffer,1024);
+		// printf("in while 1 loop of library\n");
 		if (flag == 0)//not in cache
 		{
     		valread = read(sock , buffer, 1024); 
 			if (valread > 0) {
 				bytesread = bytesread + valread;
 				valsend = send(client_socket,buffer,valread, 0);
-				fwrite(buffer,1, valread,fp);
+				if (valsend <= 0)
+				{
+					printf("invalid valsend  : %d\n",valsend);
+					break;
+				}
+				size_t ret = fwrite(buffer,1, valread,fp);
+				fflush(fp);
+				if(ret != valread)
+				{
+					printf("fwrite error\n");
+					break;
+				}
+
 			}
 			else
 				break;
 		}
-		else //in cache
+		else if(flag == 1)//in cache
 		{
+			// printf("in cache..\n");
 			//fread and send
 			size_t nbytes = 0;
 			if( (nbytes = fread(buffer, 1, 1024, fp)) > 0)
 			{
 				cachebytes = cachebytes + nbytes;
+				// printf("cachebytes : %d\n",cachebytes);
 				valsend = send(client_socket, buffer , nbytes, 0);
+				if (valsend <= 0)
+				{
+					printf("invalid valsend  : %d\n",valsend);
+					break;
+				}
 			}
 			else
 				break;
 		}
+		else
+		{
+			cout<<"Invalid flag\n";
+			break;
+		}
 
 	}
-	close(sock);
-	fclose(fp);  
+	 
 	cout<<"Total bytes sent from server: " << bytesread << endl;
 	cout<<"Total bytes sent from cache: "<< cachebytes <<endl;
 	
+	close(sock);
+	fclose(fp); 
+
     return 0; 
 }
 
@@ -488,7 +525,7 @@ ostream& operator<<(ostream &os, const PAGE_CACHE_T &obj){
 	}
 
 template<class X, class Y>
-void printCache(unordered_map<X,Y> &map)
+void printCache(const unordered_map<X,Y> &map)
 {
 	//cout<<"--Printing hostname Cache"<<endl;
 	for(auto x: map)
