@@ -1,6 +1,7 @@
 #include "includes.h"
 #include "commandhandler.hpp"
 // reference : https://www.geeksforgeeks.org/socket-programming-cc/
+extern received_packet_t filepart;
 
 int main(int argc, char const *argv[]) 
 { 
@@ -13,6 +14,12 @@ int main(int argc, char const *argv[])
     char mesg[50]= "Authentication_Successful";
     char fail[10] = "fail";
     char path[50] = {0};
+    char info[1024] = {0};
+    FILE *fp1, *fp2;
+    string pathname;
+    int commandflag = 0;
+    
+
     //char *hello = "Hello from server"; 
 
     if(argc < 3)
@@ -99,6 +106,103 @@ int main(int argc, char const *argv[])
                 }
                 cout << res[0] << " file created in " << argv[1] << " folder" <<endl;
             }
+            int receivebytes = 0;
+            //receive command from client
+            if ((receivebytes =read(new_socket,info ,sizeof(info))) < 0)
+            {
+                printf("Error: %s and code %d\n", strerror( errno ), errno);
+            }
+            else
+            {
+                printf("Infostring : %s\n",info);
+                string infostring = string(info);
+                vector<string> clientinput = splitStrings(infostring, ','); 
+                if(clientinput[0]== "GET")
+                {
+                    commandflag = 0;    
+                }
+                else if(clientinput[0]== "PUT")
+                {
+                    commandflag = 1;
+                }
+                else if(clientinput[0]== "LIST")
+                {
+                    commandflag = 2;
+                }
+                else if (clientinput[0]== "MKDIR")
+                {
+                    commandflag = 3;
+                }
+                else commandflag = 4;
+                parse_infostring(infostring,commandflag);
+                // handling commands on server side
+                if (commandflag == 1)
+                {
+                    char file_part_data1[filepart.file_part_1_size] = {0};
+                    char file_part_data2[filepart.file_part_2_size] = {0};
+                    if (filepart.server_num == 1)
+                    {
+                        send(new_socket,"Server 1 OK",15,0);
+                        pathname = "DFS1/"+filepart.username + "/";
+                    }
+                    if (filepart.server_num == 2)
+                    {
+                        send(new_socket,"Server 2 OK",15,0);
+                        pathname = "DFS2/"+filepart.username + "/";
+                    }
+                    if (filepart.server_num == 3)
+                    {
+                        send(new_socket,"Server 3 OK",15,0);
+                        pathname = "DFS3/"+filepart.username + "/";
+                    }
+                    if (filepart.server_num == 4)
+                    {
+                        send(new_socket,"Server 4 OK",15,0);
+                        pathname = "DFS4/"+filepart.username + "/";
+                    }
+                    read(new_socket,file_part_data1 ,sizeof(file_part_data1));
+                    read(new_socket,file_part_data2 ,sizeof(file_part_data2));
+                    printf("data file part 1: %s\n",file_part_data1);
+                    printf("data file part 2: %s\n",file_part_data2);
+                    printf("username : %s\n",filepart.username.c_str());
+                    string filepartname1 = pathname + filepart.nameoffile + "."+ std::to_string(filepart.file_part_1);
+                    string filepartname2 = pathname + filepart.nameoffile + "."+ std::to_string(filepart.file_part_2);
+                    //cout << filepartname1 << endl;
+                    fp1 = fopen(filepartname1.c_str(),"wb");
+                    fp2 = fopen(filepartname2.c_str(),"wb");
+                    fwrite(file_part_data1 , 1 , sizeof(file_part_data1) , fp1 );
+                    fwrite(file_part_data2 , 1 , sizeof(file_part_data2) , fp2 );
+                    fclose(fp1);
+                    fclose(fp2);
+                    memset(file_part_data1,0,sizeof(file_part_data1));
+                    memset(file_part_data2,0,sizeof(file_part_data2));
+                }
+                if (commandflag == 0)
+                {
+                  if (filepart.server_num == 1)
+                    {
+                        send(new_socket,"Server 1 OK",15,0);
+                        //pathname = "DFS1/"+filepart.username + "/";
+                    }
+                    if (filepart.server_num == 2)
+                    {
+                        send(new_socket,"Server 2 OK",15,0);
+                        //pathname = "DFS2/"+filepart.username + "/";
+                    }
+                    if (filepart.server_num == 3)
+                    {
+                        send(new_socket,"Server 3 OK",15,0);
+                       // pathname = "DFS3/"+filepart.username + "/";
+                    }
+                    if (filepart.server_num == 4)
+                    {
+                        send(new_socket,"Server 4 OK",15,0);
+                        //pathname = "DFS4/"+filepart.username + "/";
+                    }  
+                    
+                }
+            }
+
         //printf("%s\n",buffer ); 
         //send(new_socket , hello , strlen(hello) , 0 ); 
         //printf("Hello message sent\n"); 

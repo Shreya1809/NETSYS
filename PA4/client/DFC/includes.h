@@ -42,15 +42,7 @@ typedef enum
 Error_code;
 
 
-typedef struct
-{
-    string ver;
-    string status_code;
-    string status_mesg;
-    string content_type;
-    string content_length;
-    string file_content;
-}http_response_t;
+
 
 typedef struct
 {

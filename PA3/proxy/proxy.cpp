@@ -62,6 +62,7 @@ int main(int argc, char const *argv[])
 { 
     int server_fd, new_socket;
     struct sockaddr_in server_addr; 
+    //struct sockaddr_in server_addr_prefetch;
     int opt = 1; 
     int addrlen = sizeof(server_addr);  
     //char dl = ' '; //delimiter for parsing string

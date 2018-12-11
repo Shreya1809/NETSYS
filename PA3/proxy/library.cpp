@@ -185,14 +185,15 @@ int error_handler(int socket_client, http_request_t Request, http_response_t Res
 		std::stringstream buffer;
 		buffer << myFile.rdbuf();
 		Response.ver = Request.version;
-		Response.status_code = "404";
-		Response.status_mesg = "NOT FOUND";
-		Response.content_type = "html";
-		Response.file_content = buffer.str();
-		Response.content_length = to_string(Response.file_content.size());
-		cout << "URL ERROR "<< endl;
-		send_response(Response,socket_client);
-		return 1;
+		//Response.status_code = "404";
+		//Response.status_mesg = "NOT FOUND";
+		//Response.content_type = "html";
+		//Response.file_content = buffer.str();
+		//Response.content_length = to_string(Response.file_content.size());
+		//cout << "URL ERROR "<< endl;
+		//send_response(Response,socket_client);
+		//return 1;
+		return 0;
 
 	}
 	
@@ -425,7 +426,7 @@ int server_side_handler(int client_socket,string Send_reqbuff,const char *IPbuff
 		if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) 
 		{ 
 			printf("\nConnection Failed \n"); 
-			return -1; 
+			//return -1; 
 		} 
 		// std::string str("GET http://"+ string(IPbuffer)+"/ HTTP/1.0 \r\n\r\n");
 		//std::string str("GET / HTTP/1.0 \r\n\r\n");
@@ -452,7 +453,7 @@ int server_side_handler(int client_socket,string Send_reqbuff,const char *IPbuff
 
 		
 		printf("------------PAGE Cache list Contents as follows------------\n");
-		//printCache<string,PAGE_CACHE_T>(PageCache);
+		printCache<string,PAGE_CACHE_T>(PageCache);
 		printf("---------------End of PAGE Cache list Contents-------------\n");
 	}
 
@@ -534,3 +535,6 @@ void printCache(const unordered_map<X,Y> &map)
 	}
 
 }
+
+
+ 
