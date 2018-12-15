@@ -263,6 +263,8 @@ void getfilehandler(string pathname,send_packet_t sendfile, int sock)
 
         }
         //sending data to client
+        struct timeval timeout = {0,5000};
+		setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
         if(caseflag == 1)
         {
             cout << "Sending to client part :" << sendfile.file_part_1 << "\n data :" << sendfile.file_part_data[sendfile.file_part_1] << endl;
@@ -403,17 +405,26 @@ void listfilehandler(string pathname,list_packet_t listfile, int sock)
         cout <<"i is " << i << endl;
         for(int j = 0;j < i;j++)
         {
-            cout << filename[j] << endl;
+            cout << "filename[j]" << filename[j] << endl;
+            //cout << "filename[j] length" << filename[j].() << endl;
             //cout << "list item  " << j << endl;
-            if(filename[j].length() > 2)
+            if(filename[j].size() > 2)
             {
-                vector<string> name = splitStrings(filename[j], '.');
-                //cout << "name :" << name[0] << ", number :" << name[1]  << endl; 
-                listfile.nameoffile = name[0];
-                listfile.filepart = stoi(name[1]);
-                listfile.completefilename = filename[j];
-                sendlist += listfile.nameoffile +","+ std::to_string(listfile.filepart)+ ","+"\n";
-                
+                size_t found = filename[j].find(".");
+                if (found!=std::string::npos)//found
+                {
+                    vector<string> name = splitStrings(filename[j], '.');
+                    cout << "name :" << name[0] << ", number :" << name[1]  << endl; 
+                    listfile.nameoffile = name[0];
+                    listfile.filepart = stoi(name[1]);
+                    listfile.completefilename = filename[j];
+                    sendlist += listfile.nameoffile +","+ std::to_string(listfile.filepart)+ ","+"\n";
+                }
+                else //its a subfolder 
+                {
+                    listfile.nameoffile = filename[j];
+                    sendlist += listfile.nameoffile + ",9,\n";
+                }   
             }
             
         }

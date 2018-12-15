@@ -140,6 +140,8 @@ int main(int argc, char const *argv[])
                 // handling commands on server side
                 if (commandflag == 1)
                 {
+                    struct timeval timeout = {1,0};
+			        setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
                     char file_part_data1[filepart.file_part_1_size];
                     char file_part_data2[filepart.file_part_2_size];
                     memset(file_part_data1,0,filepart.file_part_1_size);
@@ -183,7 +185,11 @@ int main(int argc, char const *argv[])
                         send(new_socket,"Server 4 OK",15,0);
                         pathname = "DFS4/"+filepart.username + subfoldername;
                     }
+                    timeout = {2,0};
+				    setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
                     read(new_socket,file_part_data1 ,sizeof(file_part_data1));
+                    timeout = {2,0};
+				    setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
                     read(new_socket,file_part_data2 ,sizeof(file_part_data2));
                     printf("data file part 1: %s\n",file_part_data1);
                     printf("data file part 2: %s\n",file_part_data2);

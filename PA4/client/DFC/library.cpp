@@ -450,6 +450,8 @@ void ClientGetCommandHandler(string filename, string subfolder,file_packet_t fil
     if(infoRead == 0){
         cout<<"info read Error"<<endl;
     }
+    struct timeval timeout = {1,0};
+	setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
     cout<<"#FROM SERVER TO CLIENT ----> "<< getinfo << endl;;
     getinfo[infoRead+1] = 0;
     //cout << getinfo << endl;
@@ -605,9 +607,11 @@ vector<string> splitString(std::string s, const std::string &delimiter){
 }
 
 string getFileStatusFromParts(string s){
-    
+
+    bool folderflag = false;
     std::string delimiter = "\n";
     vector<string> splits = splitString(s,delimiter);
+    //cout << "string s: " << s << endl;
     unordered_map<string,vector<int>> filemap;
     for(auto str: splits){
         // cout<<"Split:"<<str<<endl;
@@ -626,6 +630,7 @@ string getFileStatusFromParts(string s){
                 filemap.insert(std::pair<string,vector<int>>(fileParts[0],vector<int>(4,0)));
             }
             itr = filemap.find(fileParts[0]);
+            //cout << fileParts[0] << endl;
             int partno = stoi(fileParts[1]);
             // cout<<"Part no:"<<partno<<endl;
             if( partno < 4){
@@ -635,6 +640,13 @@ string getFileStatusFromParts(string s){
                 //     cout<<x;
                 // }
                 // cout<<endl;
+                
+            }
+            if(partno == 9)
+            {
+                //cout <<"its a folder" << endl;
+               //itr->second[9] = 9;
+               folderflag = true;
             }
             
         }
@@ -644,11 +656,19 @@ string getFileStatusFromParts(string s){
     for(auto x: filemap){
         // cout<<"Filename:"<<x.first<<" Parts Available:";
         fileAvailability += string(x.first);
-        bool flag = false;
+        //cout  << fileAvailability << endl;
+        int flag = 0;
         for(auto i =0; i< x.second.size(); i++){
             
             if(x.second[i] == 0){
-                flag = true;
+                flag = 1;//incomplete
+                //folderflag = false;
+                break;
+            }
+            else
+            {
+                flag = 0;
+                //folderflag = false;
                 break;
             }
             // else{
@@ -656,13 +676,23 @@ string getFileStatusFromParts(string s){
             // }
         }
         if(flag){
-            fileAvailability += " [incomplete]\n";
+            if(folderflag)
+            {
+                fileAvailability += "\n";
+            }
+            else
+            {
+                fileAvailability += " [incomplete]\n";
+            }
         }
-        else{
+        else {
             fileAvailability += " [complete]\n";
         }
+        
+
         // cout<<endl;
     }
+
 
     // cout<<"FileStatus:\n"<<fileAvailability<<endl;
     return fileAvailability;

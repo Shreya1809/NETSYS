@@ -22,6 +22,7 @@ int main(int argc, char const *argv[])
     int socketfailflag[4] = {0};
     FILE *fp,*fp2;
     size_t filesize = 0;
+    struct timeval timeout = {1,0};
     if(argc < 2)
     {
         printf("USAGE: ./client [dfc config file]\n");
