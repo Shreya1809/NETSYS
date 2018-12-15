@@ -1,6 +1,9 @@
 
 #include "library.hpp"
 config_t config;
+get_packet_t getfile;
+string liststring;
+int part[4]={0,0,0,0};
 vector<string> splitStrings(string str, char dl) //REFERENCE - https://www.geeksforgeeks.org/split-string-substrings-using-delimiter/
 { 
 	string word = ""; 
@@ -51,8 +54,8 @@ int parse_config_file(string configfile)
     }
     else
     {
-        cout << "Invalid config file" <<endl;
-        exit(1);
+        cout << "New config file" <<endl;
+        //exit(1);
     }
     FILE *fp;
     int i = 0 ,j = 0;
@@ -143,8 +146,15 @@ unsigned char md5hash(string filename,size_t filesize, FILE *f)
   }
  
 }
-void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no)
+void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no,int socketfailflag)
 {
+    if (socketfailflag ==1)
+    {
+        //cout << "Socket does not exists for server "<< server_no+1 <<endl;
+        printf("--------#STATUS : Server %d Down\n",server_no+1);
+        //cout << "No operation for this particular server" << endl;
+        return;   
+    }
     char status[20] = {0};
     //cout << "inside put command handler for client" << endl;
     //cout << "server_no : " << server_no << endl;
@@ -309,34 +319,18 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no)
         }
         
     }
-    /*cout << "value of structure  packet elements to send to server " << endl;
-    cout << "username : " << filepart.username << endl;
-    cout << "password : " << filepart.password << endl;
-    cout << "command : " << filepart.command << endl;
-    cout << "name of file : " << filepart.nameoffile << endl;
-    cout << "Server No : " << filepart.server_num << endl;
-    cout << "md5val : " << filepart.md5val << endl;
-    cout << "1st file part no to server : " << filepart.file_part_1 << endl;
-    cout << "2nd file part no to server : " << filepart.file_part_2 << endl;
     
-    cout << "size of 1st file part : " << filepart.file_part_size[filepart.file_part_1] << endl;
-    cout << "size of 2nd file part : " << filepart.file_part_size[filepart.file_part_2] << endl;
-
-    cout << "size of the structure to be sent " << sizeof(filepart) << endl;*/
-    //cout << "data in 1st file part no to server : " << filepart.file_part_data1 << endl;
-    //cout << "data in 2nd file part no to server : " << filepart.file_part_data2 << endl;
-    //printf("data with c_str() : %s\n",filepart.file_part_data1.c_str());
     int sendbytes = 0;
     string infostring = filepart.command+","+filepart.username + "," +filepart.password+","+std::to_string(filepart.server_num)+","+filepart.nameoffile+","
     +filepart.md5val+","+std::to_string(filepart.file_part_1)+","+std::to_string(filepart.file_part_size[filepart.file_part_1])+","+std::to_string(filepart.file_part_2)+","+
     std::to_string(filepart.file_part_size[filepart.file_part_2]);
-    cout << infostring << endl;
+    cout << "#FROM CLIENT TO SERVER ---> "<< infostring << endl;
     //send information string to designated server
     
     if((sendbytes = send(sock,infostring.c_str(), 1024, 0)) < 0)
     {
         //printf("Error: %s and code %d\n", strerror( errno ), errno);
-        printf("Server %d Down\n",filepart.server_num);
+        printf("--------#STATUS : Server %d Down\n",filepart.server_num);
     }
     //printf("bytes sent = %d\n", sendbytes);
 
@@ -347,13 +341,15 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no)
     }
     else
     {
-        printf("Status : %s\n",status);
+        printf("--------#STATUS : %s\n",status);
         sendbytes = 0;
-        if ((sendbytes = send(sock,filepart.file_part_data1.c_str(),filepart.file_part_size[filepart.file_part_1],0)) < 0)
+        string encrypted_data1 = encryptdecrypt(filepart.file_part_data1,"5");
+        if ((sendbytes = send(sock,encrypted_data1.c_str(),filepart.file_part_size[filepart.file_part_1],0)) < 0)
         {
             printf("Error: %s and code %d\n", strerror( errno ), errno);    
         }
-        if ((sendbytes = send(sock,filepart.file_part_data2.c_str(),filepart.file_part_size[filepart.file_part_2],0)) < 0)
+        string encrypted_data2 = encryptdecrypt(filepart.file_part_data2,"5");
+        if ((sendbytes = send(sock,encrypted_data2.c_str(),filepart.file_part_size[filepart.file_part_2],0)) < 0)
         {
             printf("Error: %s and code %d\n", strerror( errno ), errno);    
         }
@@ -361,28 +357,365 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no)
     
 }
 
-void ClientGetCommandHandler(string filename,file_packet_t filepart,int sock,int serverno)
+void ClientGetCommandHandler(string filename,file_packet_t filepart,int sock,int serverno,int  socketfailflag)
 {
+
+    if (socketfailflag ==1)
+    {
+        //cout << "Socket does not exists for server "<< serverno+1 <<endl;
+        printf("Server %d Down\n",serverno+1);
+        //cout << "No operation for this particular server" << endl;
+        return;   
+    }
+    
+    //int part1 = 0, part2 = 1,part3 = 2,part4 = 3;
+    string part_req;
     char status[20] = {0};
+    char getinfo[1024] = {0};
+    char *p_getinfo = &getinfo[0];
+    char clientmesg[15] = "Client says OK";
+    int datasize1 = 0;
+    int datasize2 = 0;
     filepart.server_num = serverno;
     filepart.command = "GET";
     filepart.nameoffile = filename;
-    string infostring = filepart.command+","+ filepart.nameoffile+"," + std::to_string(serverno);
+    int serverdownflag = 0;
+    for(int a = 0;a < 4;a++)
+    {
+        if(part[a]== 0)
+        {
+            part_req += std::to_string(a)+",";
+        }
+        else
+        {
+            cout << "Part Checking for Traffic Optimisation : " << a << " available in string" <<endl;
+        }
+
+    }
+    string infostring = filepart.command+","+ filepart.nameoffile+"," + std::to_string(serverno) +"," + filepart.username + "- " + part_req;
+    cout << infostring << endl;
     int sendbytes = 0;
     if ((sendbytes = send(sock,infostring.c_str(),infostring.length(),0)) < 0)
     {
         //printf("Error: %s and code %d\n", strerror( errno ), errno); 
-        printf("Server %d Down\n",filepart.server_num);
+        printf("--------#STATUS: Server %d Down\n",filepart.server_num);
+        serverdownflag = filepart.server_num;
     }
-    read(sock,status ,20);
+    read(sock,status ,11);
     if(strlen(status)<3)
     {
         printf("Status : Server Number %d is broken\n",filepart.server_num);
     }
     else
     {
-        printf("Status : %s\n",status);
+        printf("--------#STATUS : %s\n",status);
+    }
+    memset(p_getinfo,0,1024);
+    size_t infoRead  = read(sock,p_getinfo,1024);
+    if(infoRead == 0){
+        cout<<"info read Error"<<endl;
+    }
+    cout<<"#FROM SERVER TO CLIENT ----> "<< getinfo << endl;;
+    getinfo[infoRead+1] = 0;
+    //cout << getinfo << endl;
+    string getinfostring = string(getinfo,infoRead+1);
+    vector<string> getelement = splitStrings(getinfostring, ',');
+    getfile.username = getelement[1];
+    getfile.server_num = stoi(getelement[2]);
+    getfile.nameoffile = getelement[3];
+    getfile.file_part_1 = stoi(getelement[4]);
+    datasize1 = stoi(getelement[5]);
+    datasize2 = stoi(getelement[7]);
+    getfile.file_part_2 = stoi(getelement[6]);
+    //char datapart1[datasize1] = {0};
+    //char datapart2[datasize2] = {0};
+    char servermesg[50]={0};
+    char partsize[50]={0};
+    int receiveflagmesg =0;
+    int receiveflagsize =0;
+    //cout 
+    cout << "size of 1st file part : " << datasize1 << endl;
+    cout << "size of 2nd file part : " << datasize2 << endl;
+    if((datasize1 == 0) && (datasize2 == 0))
+    {
+        return;
     }
 
+
+    sendbytes = 0;
+    if ((sendbytes = send(sock,clientmesg,strlen(clientmesg)+1,0)) < 0)
+    {
+        //printf("Error: %s and code %d\n", strerror( errno ), errno); 
+        printf("--------#STATUS : Server %d Down\n",getfile.server_num);
+    }
+    // get the no of parts from server 
+    read(sock,servermesg,sizeof(servermesg));
+    string server_mesg = string(servermesg);
+    cout <<"Part available in this server for receiving : "<<servermesg <<endl;
+    if(server_mesg.length() != 1)
+    {
+        vector<string> splitserver = splitStrings(server_mesg, '\n'); 
+        if(splitserver[0].length() == 0)
+        {
+            receiveflagmesg == -1;
+        }
+        if((splitserver[0]).length()>2)
+        {
+            vector<string> splitservermesg = splitStrings(splitserver[0], ','); 
+            getfile.file_part_1 = stoi(splitservermesg[0]);
+            getfile.file_part_2 = stoi(splitservermesg[1]);
+            part[getfile.file_part_1]++;
+            part[getfile.file_part_2]++;
+            cout << "part["<< getfile.file_part_1 << "] is "<< part[getfile.file_part_1] << endl;
+            cout << "part["<< getfile.file_part_2 << "] is "<< part[getfile.file_part_2] << endl;
+            receiveflagmesg = 1;
+            
+
+
+        }
+        else
+        {
+            
+            getfile.file_part_1 = stoi(splitserver[0]);
+            part[getfile.file_part_1]++;
+            cout << "part["<< getfile.file_part_1 << "] is "<< part[getfile.file_part_1] << endl;
+            receiveflagmesg = 0;
+        }
+    }
+    //get the size of parts
+    read(sock,partsize,sizeof(partsize));
+    string part_size = string(partsize);
+    cout << "Part Sizes : " << part_size <<endl;
+    //cout << "size of part sizes : " << part_size.length() << endl;
+    if(part_size.length() > 1)
+    {
+        vector<string> splitsize = splitStrings(part_size, '\n'); 
+        if(splitsize[0].length() == 0)
+        {
+            receiveflagsize == -1;
+            cout << " receive flag is -1" <<endl;
+        }
+        //if((splitsize[0]).length()>2)
+        //{
+        size_t found = (splitsize[0]).find(",");
+        if (found==std::string::npos)//single item
+        {
+            getfile.file_part_1_size = stoi(splitsize[0]);
+            receiveflagsize = 0;
+            
+        }
+        else
+        {
+            vector<string> splitsizestring = splitStrings(splitsize[0], ','); 
+            getfile.file_part_1_size = stoi(splitsizestring[0]);
+            getfile.file_part_2_size = stoi(splitsizestring[1]);
+            receiveflagsize = 1;
+            
+        }
+    }
+    else return;
+    //sending ok to server to go ahead with the transmission
+    int sbytes = 0;
+    if ((sbytes = send(sock,"OK",3,0)) < 0)
+        {
+            printf("Error: %s and code %d\n", strerror( errno ), errno);    
+        }
+    cout << "Receiving data from server ....." << endl;
+    if((receiveflagmesg == 1) &&(receiveflagsize == 1))
+    {
+        int rbytes = 0;
+        char datapart1[getfile.file_part_1_size] = {0};
+        char datapart2[getfile.file_part_2_size] = {0};
+        if ((rbytes =read(sock,datapart1,sizeof(datapart1))) < 0 )
+        {
+            printf("rbytes : %d\n",rbytes);
+
+        }
+        getfile.file_part_data[getfile.file_part_1] = string(datapart1,sizeof(datapart1));
+        //else  cout << " data part : " << getfile.file_part_1<<  "\n data: " << datapart1 <<endl;
+        if ((rbytes =read(sock,datapart2,sizeof(datapart2))) < 0 )
+        {
+            printf("rbytes : %d\n",rbytes);
+            
+        }
+        getfile.file_part_data[getfile.file_part_2] = string(datapart2,sizeof(datapart2));
+        //else cout << " data part : " << getfile.file_part_2<<  "\n data: " << datapart2 <<endl;
+    }
+    else if((receiveflagmesg == 0) &&(receiveflagsize == 0))
+    {
+        char datapart1[getfile.file_part_1_size] = {0};
+        read(sock,datapart1,sizeof(datapart1));
+        getfile.file_part_data[getfile.file_part_1] = string(datapart1,sizeof(datapart1));
+        //cout << " data part : " << getfile.file_part_1<<  "\n data: " << datapart1 <<endl;
+        //printf(" data part :%d \n data: %s\n",getfile.file_part_1,datapart1);
+    }
     
 }
+vector<string> splitString(std::string s, const std::string &delimiter){
+
+    // cout<<"To be split:"<<s<<endl;
+    vector<string> splitStrings;
+    size_t pos = 0;
+    std::string token;
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token  = s.substr(0, pos);
+        // std::cout << "token:"<<token << std::endl;
+        splitStrings.push_back(token);
+        s.erase(0, pos + delimiter.length());
+    }
+    // std::cout << s << std::endl;
+
+    return splitStrings;
+}
+
+string getFileStatusFromParts(string s){
+    
+    std::string delimiter = "\n";
+    vector<string> splits = splitString(s,delimiter);
+    unordered_map<string,vector<int>> filemap;
+    for(auto str: splits){
+        // cout<<"Split:"<<str<<endl;
+        vector<string> fileParts;
+        fileParts = splitString(str,",");
+        // cout<<"I Split size:"<<fileParts.size()<<endl;
+        // for(auto k: fileParts){
+        //     cout<<k<<endl;
+        // }
+        if(fileParts.size() == 2 ){
+            // cout<<"Filename:"<<fileParts[0]<<" Partno:"<<fileParts[1]<<endl;
+            auto itr = filemap.find(fileParts[0]);
+            if(itr == filemap.end()){
+                //key does not exist
+                //make a vector of size 4 for 4 parts and init with 0
+                filemap.insert(std::pair<string,vector<int>>(fileParts[0],vector<int>(4,0)));
+            }
+            itr = filemap.find(fileParts[0]);
+            int partno = stoi(fileParts[1]);
+            // cout<<"Part no:"<<partno<<endl;
+            if( partno < 4){
+                itr->second[partno]++;
+                // cout<<"Updated:";
+                // for(auto x:itr->second){
+                //     cout<<x;
+                // }
+                // cout<<endl;
+            }
+            
+        }
+    }
+
+    string fileAvailability = "";
+    for(auto x: filemap){
+        // cout<<"Filename:"<<x.first<<" Parts Available:";
+        fileAvailability += string(x.first);
+        bool flag = false;
+        for(auto i =0; i< x.second.size(); i++){
+            
+            if(x.second[i] == 0){
+                flag = true;
+                break;
+            }
+            // else{
+            //     cout<<i;
+            // }
+        }
+        if(flag){
+            fileAvailability += " [incomplete]\n";
+        }
+        else{
+            fileAvailability += " [complete]\n";
+        }
+        // cout<<endl;
+    }
+
+    // cout<<"FileStatus:\n"<<fileAvailability<<endl;
+    return fileAvailability;
+    
+}
+
+
+void ClientListCommandHandler(int sock,int serverno,int socketfailflag)
+{
+    if (socketfailflag ==1)
+    {
+        //cout << "Socket does not exists for server "<< serverno+1 <<endl;
+        printf("--------#STATUS : Server %d Down\n",serverno+1);
+        //cout << "No operation for this particular server" << endl;
+        return;   
+    }
+    
+    char status[15] = {0};
+    char listitems[1024] = {0};
+    int sendbytes = 0;
+    int server = serverno +1;
+    string listdata = "LIST," + config.username+ "," + config.password +","+ std::to_string(server);
+    if ((sendbytes = send(sock,listdata.c_str(),listdata.length(),0)) < 0)
+    {
+        printf("--------#STATUS : Server %d Down\n",serverno);
+    }
+
+    read(sock,status,15);
+    //cout << listitems << endl;
+    if(strlen(status)<3)
+    {
+       printf("--------#STATUS : Server %d Down\n",serverno);
+    }
+    else printf("--------#STATUS : %s\n",status);
+    //
+    
+    read(sock,listitems,sizeof(listitems));
+    liststring +=listitems;
+        
+}
+void ClientMkdirCommandHandler(string subfolder,int sock,int serverno,int  socketfailflag)
+{
+    if(socketfailflag == 1)
+    {
+        printf("--------#STATUS : Server %d Down\n",serverno+1);
+        return;   
+    }
+    string mkbuf;
+    char status[15]={0};
+    mkbuf = "MKDIR," + subfolder + "," + config.username + "," + std::to_string(serverno);
+    send(sock,mkbuf.c_str(), mkbuf.size(), 0);
+    read(sock,status,15);
+    if(strlen(status)<3)
+    {
+       printf("--------#STATUS : Server %d Down\n",serverno);
+    }
+    else printf("--------#STATUS : %s\n",status);
+}
+
+void encryptDecrypt(char inpString[]) 
+{ 
+    // Define XOR key 
+    // Any character value will work 
+    char xorKey = 'P'; 
+  
+    // calculate length of input string 
+    int len = strlen(inpString); 
+  
+    // perform XOR operation of key 
+    // with every caracter in string 
+    for (int i = 0; i < len; i++) 
+    { 
+        inpString[i] = inpString[i] ^ xorKey; 
+        printf("%c",inpString[i]); 
+    } 
+} 
+string encryptdecrypt(string msg, string key)
+{
+    // Make sure the key is at least as long as the message
+    std::string tmp(key);
+    while (key.size() < msg.size())
+        key += tmp;
+    
+    // And now for the encryption part
+    for (string::size_type i = 0; i < msg.size(); ++i)
+        msg[i] ^= key[i];
+    return msg;
+}
+
+
+    
+ 

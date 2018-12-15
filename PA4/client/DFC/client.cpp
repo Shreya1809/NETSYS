@@ -6,6 +6,9 @@
 #define SERVERNUM 4
 extern config_t config;
 file_packet_t filepart;
+extern string liststring;
+extern get_packet_t getfile;
+extern int part[4];
 int main(int argc, char const *argv[]) 
 { 
     string enteredstring, configmesg;
@@ -16,6 +19,7 @@ int main(int argc, char const *argv[])
     int port,opt = 1;
     int sock[4] = {0};
     unsigned char md5 = 3;
+    int socketfailflag[4] = {0};
     FILE *fp,*fp2;
     size_t filesize = 0;
     if(argc < 2)
@@ -62,34 +66,73 @@ int main(int argc, char const *argv[])
             { 
                 printf("Error: %s and code %d\n", strerror( errno ), errno);
                 printf("\nConnection Failed socket %d\n",sock[j]);
-                //printf("Server addr: %u\n",server_addr[j]);
-                //return -1; 
+                socketfailflag[j] = 1;
+            
             } 
-            cout << "Connected socket " << sock[j] << endl;
-            //printf("Server addr: %u\n",server_addr[j]);
-            send(sock[j] , configmesg.c_str() , configmesg.length() , 0 ); 
-            cout<<"Configuration Information Sent to server " << j << endl; 
-            valread = read( sock[j] , buff, 1024); 
-            //printf("%s\n",buff); 
-            string configbuff = string(buff);
-            if(configbuff.compare("Authentication_Successful")== 0)
+            else socketfailflag[j] = 0;
+            if(socketfailflag[j] != 1)
             {
-                cout << "Authentication Successful" << endl;
-            }
-            else
-            {
-                cout << "Error: Authentication failed" << endl;
-                exit(0);
-
-            }
-            //return 0; 
+                //cout << "Connected socket " << sock[j] << endl;
+                //printf("Server addr: %u\n",server_addr[j]);
+                send(sock[j] , configmesg.c_str() , configmesg.length() , 0 ); 
+                cout<<"Configuration Information Sent to server " << j+1 << endl; 
+                valread = read( sock[j] , buff, 1024); 
+                //printf("%s\n",buff); 
+                string configbuff = string(buff);
+                if(configbuff.compare("Authentication_Successful")== 0)
+                {
+                    cout << "Authentication Successful" << endl;
+                }
+                else
+                {
+                    cout << "Error: Authentication failed" << endl;
+                    cout << "invalid username/password" << endl;
+                    exit(0);
+                }
+                //return 0;
+            } 
         }
         if((entered_option[0].compare("GET")==0) || (entered_option[0].compare("get")==0))
         {
+            FILE *fp;
+            //part[4]={0,0,0,0};
+            int completeflag = 1;
+            part[0]=0;
+            part[1]=0;
+            part[2]=0;
+            part[3]=0;
             printf("Command Entered is GET and filename is %s\n",entered_option[1].c_str());
             for(int a = 0; a <4; a++)
             {
-                ClientGetCommandHandler(entered_option[1],filepart,sock[a],a);
+                ClientGetCommandHandler(entered_option[1],filepart,sock[a],a,socketfailflag[a]);
+            }
+            if(part[0]== 1 && part[1] == 1 && part[2] == 1 && part[3] == 1)
+            {
+                fp = fopen((getfile.nameoffile).c_str(), "wb");
+                cout << "#FILE COMPLETE" << endl;
+                printf("%d,%d,%d,%d\n",part[0],part[1],part[2],part[3]);
+                if(fp!=NULL)
+                {
+                    for(int j = 0;j < 4;j++)
+                    {
+                        //cout << "Data [" << j << "] : " << getfile.file_part_data[j] << endl ;
+                        string decryptedmesg = encryptdecrypt((getfile.file_part_data[j]),"5");
+                        fwrite(decryptedmesg.c_str(),(getfile.file_part_data[j]).size(),1,fp);
+                    }
+                }
+                fclose(fp);
+                
+            }
+            else if((part[0]== 0 && part[1] == 0 && part[2] == 0 && part[3] == 0))
+            {
+                printf("%d,%d,%d,%d\n",part[0],part[1],part[2],part[3]);
+                cout << "#FILE DOES NOT EXIST AT ALL" << endl;    
+            }
+            else
+            {
+                printf("%d,%d,%d,%d\n",part[0],part[1],part[2],part[3]);
+                cout << "#CANNOT CREATE COMPLETE FILE" << endl;
+                
             }
             
         }
@@ -120,7 +163,8 @@ int main(int argc, char const *argv[])
                 //devide filesize into 4 parts
                 f = f/SERVERNUM;
                 int file_Size_Server = ceil(f);
-                char filepartbuf[file_Size_Server] = {0};
+                char filepartbuf[file_Size_Server];
+                memset(filepartbuf,0,file_Size_Server);
                 //set size for each part in case filesize is not divisible by 4
                 for(filepart.file_part_serial_no = 0;filepart.file_part_serial_no < SERVERNUM;filepart.file_part_serial_no++)
                 {
@@ -133,23 +177,17 @@ int main(int argc, char const *argv[])
                     {
                         filepart.file_part_size[filepart.file_part_serial_no] = file_Size_Server;
                     } 
-                    //filepartbuf = (char*)malloc(filepart.file_part_size);
-                    //cout <<"size of part " << filepart.file_part_serial_no << " is "<<filepart.file_part_size << endl;
+                    
                     memset(filepartbuf, 0, sizeof(filepartbuf)); 
                     fread(filepartbuf,1,filepart.file_part_size[filepart.file_part_serial_no],fp);
                     filepart.file_part_data[filepart.file_part_serial_no] = std::string(filepartbuf,filepart.file_part_size[filepart.file_part_serial_no]);
-                    //cout << "Size:"<<filepart.file_part_data[filepart.file_part_serial_no].size()<<" data is :";
-                    // for(auto x : filepart.file_part_data[filepart.file_part_serial_no]){
-                    //     cout<<x;
-                    // }
-                    //free(filepartbuf);
-
+                    
                 }
                 
                 string final_mesg = filepart.file_part_data[0]+filepart.file_part_data[1]+filepart.file_part_data[2]+filepart.file_part_data[3];
-                //cout << final_mesg <<endl;
-                //cout << "Final Msg Size:"<<final_mesg.size()<<endl;
-                char filewrite[filesize] = {0};
+                
+                char filewrite[filesize];
+                memset(filewrite,0,filesize);
                 memcpy(filewrite,final_mesg.c_str(),filesize);
                 fp2 = fopen("file","wb");
                 fwrite(filewrite,1,sizeof(filewrite),fp2);
@@ -157,7 +195,7 @@ int main(int argc, char const *argv[])
                 fclose(fp);
                 for(int k = 0;k<4;k++)
                 {
-                    ClientPutCommandHandler(filepart,sock[k],k);
+                    ClientPutCommandHandler(filepart,sock[k],k,socketfailflag[k]);
                 }
                 
             }
@@ -170,11 +208,28 @@ int main(int argc, char const *argv[])
         }
         else if((entered_option[0].compare("LIST")==0) || (entered_option[0].compare("list")==0))
         {
-            printf("Command Entered is LIST and the list is as below:\n");
+            printf("\nServer Status:\n");
+            for(int b = 0; b <4; b++)
+            {
+                ClientListCommandHandler(sock[b],b, socketfailflag[b]);
+            }
+            //cout << "\nliststring : "<< endl;
+            //cout <<liststring << endl;
+            printf("\nThe list is as below:\n");
+            cout <<getFileStatusFromParts(liststring) << endl;
+            liststring = "";
+            
+
         }
         else if((entered_option[0].compare("MKDIR")==0) || (entered_option[0].compare("mkdir")==0))
         {
             printf("Command Entered is MKDIR and the subfolder is %s\n",entered_option[1].c_str());
+            string subfolder = entered_option[1];
+            for(int i = 0;i < 4;i ++)
+            {
+                ClientMkdirCommandHandler(subfolder,sock[i],i,socketfailflag[i]);
+            }
+            
         }
         else
         {

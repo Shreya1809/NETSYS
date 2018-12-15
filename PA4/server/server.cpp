@@ -2,7 +2,9 @@
 #include "commandhandler.hpp"
 // reference : https://www.geeksforgeeks.org/socket-programming-cc/
 extern received_packet_t filepart;
-
+extern send_packet_t sendfile;
+extern list_packet_t listfile;
+extern mkdir_t mkdirfile;
 int main(int argc, char const *argv[]) 
 { 
     int server_fd, new_socket, valread; 
@@ -15,8 +17,10 @@ int main(int argc, char const *argv[])
     char fail[10] = "fail";
     char path[50] = {0};
     char info[1024] = {0};
-    FILE *fp1, *fp2;
+    FILE *fp1, *fp2 , *fp3;
     string pathname;
+    //string getlist = " ";
+    
     int commandflag = 0;
     
 
@@ -26,12 +30,7 @@ int main(int argc, char const *argv[])
     {
         printf("USAGE: ./server [DFS folder] [PORT NUM]\n");
         return 1;
-    } 
-    /*if((argv[1] != "DFS1") || (argv[1] != "DFS2") || (argv[1] != "DFS3") || (argv[1] != "DFS4"))
-    {
-        cout << "Invalid DFS" << endl;
-        exit(0);
-    }*/  
+    }   
     // Creating socket file descriptor 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) 
     { 
@@ -76,11 +75,11 @@ int main(int argc, char const *argv[])
             close(server_fd);
             cout <<" child pid " << getpid() << " from  parent pid " << getppid() << endl;
             //for(int m = 0;m < 10,000; m++);
-            valread = read( new_socket , buffer, 1024);
+    TRY:    valread = read( new_socket , buffer, 1024);
             //printf("%s\n",buffer ); 
             string configbuff = string(buffer); 
             vector<string> res = splitStrings(configbuff, ',');
-            int ret = check_configfile(res[0],res[1]);
+            int ret = check_configfile(buffer);
             if (ret == 0)
             {
                 send(new_socket , mesg , strlen(mesg) , 0 );
@@ -88,8 +87,10 @@ int main(int argc, char const *argv[])
             }
             else
             {
+                printf("return val is %d\n",ret);
                 send(new_socket , fail , strlen(fail) , 0 ); 
                 cout << "Authentication failed for pid " << getpid() <<   endl;
+                goto TRY;
             }
             sprintf(path,".%s/%s/",argv[1],res[0].c_str());
             if(FileExists(path))
@@ -129,17 +130,20 @@ int main(int argc, char const *argv[])
                 {
                     commandflag = 2;
                 }
-                else if (clientinput[0]== "MKDIR")
+                else if(clientinput[0]== "MKDIR")
                 {
                     commandflag = 3;
                 }
+
                 else commandflag = 4;
                 parse_infostring(infostring,commandflag);
                 // handling commands on server side
                 if (commandflag == 1)
                 {
-                    char file_part_data1[filepart.file_part_1_size] = {0};
-                    char file_part_data2[filepart.file_part_2_size] = {0};
+                    char file_part_data1[filepart.file_part_1_size];
+                    char file_part_data2[filepart.file_part_2_size];
+                    memset(file_part_data1,0,filepart.file_part_1_size);
+                    memset(file_part_data2,0,filepart.file_part_2_size);
                     if (filepart.server_num == 1)
                     {
                         send(new_socket,"Server 1 OK",15,0);
@@ -177,37 +181,127 @@ int main(int argc, char const *argv[])
                     memset(file_part_data1,0,sizeof(file_part_data1));
                     memset(file_part_data2,0,sizeof(file_part_data2));
                 }
-                if (commandflag == 0)
+                if (commandflag == 0) //get
                 {
-                  if (filepart.server_num == 1)
+                    
+                    if (sendfile.server_num == 1)
                     {
-                        send(new_socket,"Server 1 OK",15,0);
-                        //pathname = "DFS1/"+filepart.username + "/";
+                        send(new_socket,"Server 1 OK",11,0);
+                        pathname = "DFS1/"+sendfile.username + "/" + sendfile.nameoffile + "." ;
+                        getfilehandler(pathname,sendfile, new_socket);
+                        //filepartfinder(pathname);   
                     }
-                    if (filepart.server_num == 2)
+                    if (sendfile.server_num == 2)
                     {
-                        send(new_socket,"Server 2 OK",15,0);
-                        //pathname = "DFS2/"+filepart.username + "/";
+                        send(new_socket,"Server 2 OK",11,0);
+                        pathname = "DFS2/"+sendfile.username + "/" + sendfile.nameoffile + ".";
+                        getfilehandler(pathname,sendfile, new_socket);
                     }
-                    if (filepart.server_num == 3)
+                    if (sendfile.server_num == 3)
                     {
-                        send(new_socket,"Server 3 OK",15,0);
-                       // pathname = "DFS3/"+filepart.username + "/";
+                        send(new_socket,"Server 3 OK",11,0);
+                        pathname = "DFS3/"+sendfile.username + "/" + sendfile.nameoffile + ".";
+                        getfilehandler(pathname,sendfile, new_socket);
                     }
-                    if (filepart.server_num == 4)
+                    if (sendfile.server_num == 4)
                     {
-                        send(new_socket,"Server 4 OK",15,0);
-                        //pathname = "DFS4/"+filepart.username + "/";
+                        send(new_socket,"Server 4 OK",11,0);
+                        pathname = "DFS4/"+sendfile.username + "/" + sendfile.nameoffile + "." ;
+                        getfilehandler(pathname,sendfile, new_socket);
                     }  
                     
                 }
-            }
+                if (commandflag == 2)
+                {
+                    int partno;
+                    if (listfile.server_num == 1)
+                    {
+                        send(new_socket,"Server 1 OK",15,0);
+                        pathname = "./DFS1/"+listfile.username;
+                        listfilehandler(pathname,listfile, new_socket);   
+                    }
+                    if (listfile.server_num == 2)
+                    {
+                        send(new_socket,"Server 2 OK",15,0);
+                        pathname = "./DFS2/"+listfile.username;
+                        listfilehandler(pathname,listfile, new_socket);
+                    }
+                    if (listfile.server_num == 3)
+                    {
+                        send(new_socket,"Server 3 OK",15,0);
+                        pathname = "./DFS3/"+listfile.username;
+                        listfilehandler(pathname,listfile, new_socket);
+                    }
+                    if (listfile.server_num == 4)
+                    {
+                        send(new_socket,"Server 4 OK",15,0);
+                        pathname = "./DFS4/"+listfile.username;
+                        listfilehandler(pathname,listfile, new_socket);
+                        
+                    } 
+                
+                }
+                if(commandflag == 3)
+                {
+                    char mkdirbuf[100] = {0};
+                    string pathname;
+                    //read(new_socket,mkdirbuf,sizeof(mkdirbuf));
+                    //cout << mkdirbuf << endl;
+                    cout << "command flag " << commandflag << endl;
+                    if(mkdirfile.server_num == 1)
+                    {
+                        send(new_socket,"Server 1 OK",15,0);
+                        pathname = "DFS1/"+mkdirfile.username + "/" + mkdirfile.subfolder;
+                        if((mkdirfile.subfolder).length() > 1)
+                        {
+                            mkdir(pathname.c_str(),0700);
+                            cout << "Subfolder - "<< mkdirfile.subfolder << " created in folder "<< mkdirfile.username << " of DFS1" <<endl;
+                        }
+                        else cout << "Subfolder could not be created" << endl;
+                        
+                    }
+                    if(mkdirfile.server_num == 2)
+                    {
+                        send(new_socket,"Server 2 OK",15,0);
+                        pathname = "DFS2/"+mkdirfile.username + "/" + mkdirfile.subfolder;
+                        if((mkdirfile.subfolder).length() > 1)
+                        {
+                            mkdir(pathname.c_str(),0700);
+                            cout << "Subfolder - "<< mkdirfile.subfolder << " created in folder "<< mkdirfile.username << " of DFS2" <<endl;
+                        }
+                        else cout << "Subfolder could not be created" << endl;
+                        
+                    }
+                    if(mkdirfile.server_num == 3)
+                    {
+                        send(new_socket,"Server 3 OK",15,0);
+                        pathname = "DFS3/"+mkdirfile.username + "/" + mkdirfile.subfolder;
+                        if((mkdirfile.subfolder).length() > 1)
+                        {
+                            mkdir(pathname.c_str(),0700);
+                            cout << "Subfolder - "<< mkdirfile.subfolder << " created in folder "<< mkdirfile.username << " of DFS3" <<endl;
+                        }
+                        else cout << "Subfolder could not be created" << endl;
+                        
+                    }
+                    if(mkdirfile.server_num == 4)
+                    {
+                        send(new_socket,"Server 4 OK",15,0);
+                        pathname = "DFS4/"+mkdirfile.username + "/" + mkdirfile.subfolder;
+                        if((mkdirfile.subfolder).length() > 1)
+                        {
+                            mkdir(pathname.c_str(),0700);
+                            cout << "Subfolder - "<< mkdirfile.subfolder << " created in folder "<< mkdirfile.username << " of DFS4" <<endl;
+                        }
+                        else cout << "Subfolder could not be created" << endl;
+                    }
 
-        //printf("%s\n",buffer ); 
-        //send(new_socket , hello , strlen(hello) , 0 ); 
-        //printf("Hello message sent\n"); 
+                }
+            }
+        close(new_socket);
+        exit(0); 
         }
-        //close(server_fd);
+               
     }
     return 0; 
 }
