@@ -41,7 +41,7 @@ int main(int argc, char const *argv[])
     }
     while(1)
     {
-        printf("\nEnter any of the following commands: \n1. GET [filename] \n2. PUT [filename] \n3. LIST \n4. MKDIR [subfolder]\n");
+        printf("\nEnter any of the following commands: \n1. GET [filename] [subfolder] \n2. PUT [filename] [subfolder] \n3. LIST [subfolder] \n4. MKDIR [subfolder]\n");
         getline (cin, enteredstring);
         //cout << "command entered : " << enteredstring << endl;
         //exit(0);
@@ -104,11 +104,23 @@ int main(int argc, char const *argv[])
             printf("Command Entered is GET and filename is %s\n",entered_option[1].c_str());
             for(int a = 0; a <4; a++)
             {
-                ClientGetCommandHandler(entered_option[1],filepart,sock[a],a,socketfailflag[a]);
+                ClientGetCommandHandler(entered_option[1], entered_option[2],filepart,sock[a],a,socketfailflag[a]);
             }
             if(part[0]== 1 && part[1] == 1 && part[2] == 1 && part[3] == 1)
             {
-                fp = fopen((getfile.nameoffile).c_str(), "wb");
+                string subfolderstring;
+                if(filepart.subfolder == ".")
+                {
+                    subfolderstring = getfile.nameoffile;
+                    
+                }
+                else 
+                {
+                    mkdir((getfile.subfolder).c_str(),0700);
+                    subfolderstring =  getfile.subfolder +"/"+ getfile.nameoffile;
+                    //cout << "subfolderstring " << subfolderstring << endl;
+                }
+                fp = fopen(subfolderstring.c_str(), "wb");
                 cout << "#FILE COMPLETE" << endl;
                 printf("%d,%d,%d,%d\n",part[0],part[1],part[2],part[3]);
                 if(fp!=NULL)
@@ -119,9 +131,13 @@ int main(int argc, char const *argv[])
                         string decryptedmesg = encryptdecrypt((getfile.file_part_data[j]),"5");
                         fwrite(decryptedmesg.c_str(),(getfile.file_part_data[j]).size(),1,fp);
                     }
+                    fclose(fp);
                 }
-                fclose(fp);
-                
+                else
+                {
+                    cout << "fp is null" << endl;
+                }
+               
             }
             else if((part[0]== 0 && part[1] == 0 && part[2] == 0 && part[3] == 0))
             {
@@ -141,6 +157,7 @@ int main(int argc, char const *argv[])
             printf("Command Entered is PUT and filename is %s\n",entered_option[1].c_str());
             filepart.command = "PUT";
             filepart.nameoffile = entered_option[1];
+            filepart.subfolder = entered_option[2];
             string filename = "root/" + entered_option[1];
             printf("filename %s\n",filename.c_str());
             // check if file exits
@@ -208,13 +225,13 @@ int main(int argc, char const *argv[])
         }
         else if((entered_option[0].compare("LIST")==0) || (entered_option[0].compare("list")==0))
         {
+            string subfolder = entered_option[1];
             printf("\nServer Status:\n");
             for(int b = 0; b <4; b++)
             {
-                ClientListCommandHandler(sock[b],b, socketfailflag[b]);
+                ClientListCommandHandler(subfolder,sock[b],b, socketfailflag[b]);
             }
-            //cout << "\nliststring : "<< endl;
-            //cout <<liststring << endl;
+            
             printf("\nThe list is as below:\n");
             cout <<getFileStatusFromParts(liststring) << endl;
             liststring = "";

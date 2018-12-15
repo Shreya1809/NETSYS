@@ -25,6 +25,7 @@ typedef struct
     string md5val;
     int server_num;
     string nameoffile;
+    string subfolder;
 }received_packet_t;
 
 typedef struct
@@ -44,6 +45,7 @@ typedef struct
     int server_num;
     string nameoffile;
     string partsrequested;
+    string subfolder;
 }send_packet_t;
 
 typedef struct
@@ -56,6 +58,7 @@ typedef struct
     int server_num;
     string command;
     string completefilename;
+    string subfolder;
 }list_packet_t;
 
 typedef struct
@@ -73,5 +76,8 @@ int FileExists(const char *path);
 void getfilehandler(string pathname,send_packet_t sendfile, int sock);
 void parse_infostring(string infostring, int commandflag);
 void listfilehandler(string pathname,list_packet_t listfile, int sock);
-int CheckFileCompleteness(int new_socket,list_packet_t listfile);
+//int CheckFileCompleteness(int new_socket,list_packet_t listfile);
+int checksubfolder(int new_socket,received_packet_t filepart);
+int listsubfolder(int new_socket,list_packet_t listfile);
+int getsubfolder(int new_socket,send_packet_t sendfile);
 #endif

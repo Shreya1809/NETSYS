@@ -321,7 +321,7 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no,int s
     }
     
     int sendbytes = 0;
-    string infostring = filepart.command+","+filepart.username + "," +filepart.password+","+std::to_string(filepart.server_num)+","+filepart.nameoffile+","
+    string infostring = filepart.command+","+filepart.username + "," +filepart.password+","+std::to_string(filepart.server_num)+","+filepart.nameoffile+","+filepart.subfolder+","
     +filepart.md5val+","+std::to_string(filepart.file_part_1)+","+std::to_string(filepart.file_part_size[filepart.file_part_1])+","+std::to_string(filepart.file_part_2)+","+
     std::to_string(filepart.file_part_size[filepart.file_part_2]);
     cout << "#FROM CLIENT TO SERVER ---> "<< infostring << endl;
@@ -333,6 +333,22 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no,int s
         printf("--------#STATUS : Server %d Down\n",filepart.server_num);
     }
     //printf("bytes sent = %d\n", sendbytes);
+    char subfolderstat[10] = {0};
+    read(sock,subfolderstat,10);
+    string substat = string(subfolderstat);
+    if(substat == "FOUND")
+    {
+        cout << "Subfolder " << filepart.subfolder << " exists on the server side" << endl;
+    }
+    else if(substat == "DEFAULT")
+    {
+        cout << "Putting file parts in the respective username folders" << endl;
+    }
+    else 
+    {
+        cout << "Subfolder " << filepart.subfolder << " does not exist on the server side" << endl;
+        return;
+    }
 
     read(sock,status ,20);
     if(strlen(status)<3)
@@ -357,7 +373,7 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no,int s
     
 }
 
-void ClientGetCommandHandler(string filename,file_packet_t filepart,int sock,int serverno,int  socketfailflag)
+void ClientGetCommandHandler(string filename, string subfolder,file_packet_t filepart,int sock,int serverno,int  socketfailflag)
 {
 
     if (socketfailflag ==1)
@@ -379,6 +395,7 @@ void ClientGetCommandHandler(string filename,file_packet_t filepart,int sock,int
     filepart.server_num = serverno;
     filepart.command = "GET";
     filepart.nameoffile = filename;
+    filepart.subfolder = subfolder;
     int serverdownflag = 0;
     for(int a = 0;a < 4;a++)
     {
@@ -392,7 +409,7 @@ void ClientGetCommandHandler(string filename,file_packet_t filepart,int sock,int
         }
 
     }
-    string infostring = filepart.command+","+ filepart.nameoffile+"," + std::to_string(serverno) +"," + filepart.username + "- " + part_req;
+    string infostring = filepart.command+","+ filepart.nameoffile+"," + subfolder + ","+ std::to_string(serverno) +"," + filepart.username + "- " + part_req;
     cout << infostring << endl;
     int sendbytes = 0;
     if ((sendbytes = send(sock,infostring.c_str(),infostring.length(),0)) < 0)
@@ -401,6 +418,24 @@ void ClientGetCommandHandler(string filename,file_packet_t filepart,int sock,int
         printf("--------#STATUS: Server %d Down\n",filepart.server_num);
         serverdownflag = filepart.server_num;
     }
+
+    char subfolderstat[10] = {0};
+    read(sock,subfolderstat,10);
+    string substat = string(subfolderstat);
+    if(substat == "FOUND")
+    {
+        cout << "Subfolder " <<subfolder << " exists on the server side" << endl;
+    }
+    else if(substat == "DEFAULT")
+    {
+        cout << "Putting file parts in the respective username folders" << endl;
+    }
+    else 
+    {
+        cout << "Subfolder " << subfolder << " does not exist on the server side" << endl;
+        return;
+    }
+
     read(sock,status ,11);
     if(strlen(status)<3)
     {
@@ -423,6 +458,7 @@ void ClientGetCommandHandler(string filename,file_packet_t filepart,int sock,int
     getfile.username = getelement[1];
     getfile.server_num = stoi(getelement[2]);
     getfile.nameoffile = getelement[3];
+    getfile.subfolder = subfolder;
     getfile.file_part_1 = stoi(getelement[4]);
     datasize1 = stoi(getelement[5]);
     datasize2 = stoi(getelement[7]);
@@ -634,7 +670,7 @@ string getFileStatusFromParts(string s){
 }
 
 
-void ClientListCommandHandler(int sock,int serverno,int socketfailflag)
+void ClientListCommandHandler(string subfolder,int sock,int serverno,int socketfailflag)
 {
     if (socketfailflag ==1)
     {
@@ -648,12 +684,29 @@ void ClientListCommandHandler(int sock,int serverno,int socketfailflag)
     char listitems[1024] = {0};
     int sendbytes = 0;
     int server = serverno +1;
-    string listdata = "LIST," + config.username+ "," + config.password +","+ std::to_string(server);
+    string listdata = "LIST," + config.username+ "," +subfolder+"," + config.password +","+ std::to_string(server);
     if ((sendbytes = send(sock,listdata.c_str(),listdata.length(),0)) < 0)
     {
         printf("--------#STATUS : Server %d Down\n",serverno);
     }
 
+    char subfolderstat[10] = {0};
+    read(sock,subfolderstat,10);
+    string substat = string(subfolderstat);
+    printf("substat : %s\n",substat.c_str());
+    if(substat == "FOUND")
+    {
+        cout << "Subfolder " << subfolder << " exists on the server side" << endl;
+    }
+    else if(substat == "DEFAULT")
+    {
+        cout << "Putting file parts in the respective username folders" << endl;
+    }
+    else 
+    {
+        cout << "Subfolder " << subfolder << " does not exist on the server side" << endl;
+        return;
+    }
     read(sock,status,15);
     //cout << listitems << endl;
     if(strlen(status)<3)

@@ -40,6 +40,7 @@ typedef struct
     char md5val;
     int server_num;
     string nameoffile;
+    string subfolder;
 }file_packet_t;
 
 typedef struct
@@ -57,6 +58,7 @@ typedef struct
     char md5val;
     int server_num;
     string nameoffile;
+    string subfolder;
 }get_packet_t;
 
 
@@ -71,9 +73,9 @@ unsigned char md5hash(string filename,size_t filesize, FILE *f);
 //put command handler
 void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no,int socketfailflag);
 //get command handler
-void ClientGetCommandHandler(string filename,file_packet_t filepart,int sock,int serverno,int socketfailflag);
+void ClientGetCommandHandler(string filename,string subfolder, file_packet_t filepart,int sock,int serverno,int socketfailflag);
 //list command handler
-void ClientListCommandHandler(int sock,int serverno,int socketfailflag);
+void ClientListCommandHandler(string subfolder, int sock,int serverno,int socketfailflag);
 //mkdir command handler
 void ClientMkdirCommandHandler(string subfolder,int sock,int serverno,int  socketfailflag);
 vector<string> splitString(std::string s, const std::string &delimiter);

@@ -144,25 +144,44 @@ int main(int argc, char const *argv[])
                     char file_part_data2[filepart.file_part_2_size];
                     memset(file_part_data1,0,filepart.file_part_1_size);
                     memset(file_part_data2,0,filepart.file_part_2_size);
+                    string subfoldername;
+                    //string filestat;
+                    if(filepart.subfolder== ".")
+                    {
+                        subfoldername = "/";
+                        send(new_socket,"DEFAULT",10,0);
+                        //cout << "IN HERE "<<  endl;
+                        
+                    }
+                    else
+                    {
+                        //cout << "IN HERE TOO" << endl;
+                        subfoldername = "/" + filepart.subfolder + "/";
+                        if(!checksubfolder(new_socket,filepart))
+                        {
+                            return 0 ;
+                        }
+                    } 
                     if (filepart.server_num == 1)
                     {
                         send(new_socket,"Server 1 OK",15,0);
-                        pathname = "DFS1/"+filepart.username + "/";
+                        pathname = "DFS1/"+filepart.username + subfoldername;
+                        
                     }
                     if (filepart.server_num == 2)
                     {
                         send(new_socket,"Server 2 OK",15,0);
-                        pathname = "DFS2/"+filepart.username + "/";
+                        pathname = "DFS2/"+filepart.username + subfoldername;
                     }
                     if (filepart.server_num == 3)
                     {
                         send(new_socket,"Server 3 OK",15,0);
-                        pathname = "DFS3/"+filepart.username + "/";
+                        pathname = "DFS3/"+filepart.username + subfoldername;
                     }
                     if (filepart.server_num == 4)
                     {
                         send(new_socket,"Server 4 OK",15,0);
-                        pathname = "DFS4/"+filepart.username + "/";
+                        pathname = "DFS4/"+filepart.username + subfoldername;
                     }
                     read(new_socket,file_part_data1 ,sizeof(file_part_data1));
                     read(new_socket,file_part_data2 ,sizeof(file_part_data2));
@@ -183,30 +202,48 @@ int main(int argc, char const *argv[])
                 }
                 if (commandflag == 0) //get
                 {
+                    string subfoldername;
+                    //string filestat;
+                    if(sendfile.subfolder== ".")
+                    {
+                        subfoldername = sendfile.username + "/" + sendfile.nameoffile + "." ;
+                        send(new_socket,"DEFAULT",10,0);
+                       // cout << "IN HERE "<<  endl;
+                        
+                    }
+                    else
+                    {
+                        cout << "IN HERE NOW" << endl;
+                        subfoldername = sendfile.username+ "/" + sendfile.subfolder +"/"+ sendfile.nameoffile + "." ;;
+                        if(!getsubfolder(new_socket,sendfile))
+                        {
+                            return 0 ;
+                        }
+                    } 
                     
                     if (sendfile.server_num == 1)
                     {
                         send(new_socket,"Server 1 OK",11,0);
-                        pathname = "DFS1/"+sendfile.username + "/" + sendfile.nameoffile + "." ;
+                        pathname = "DFS1/"+ subfoldername;
                         getfilehandler(pathname,sendfile, new_socket);
                         //filepartfinder(pathname);   
                     }
                     if (sendfile.server_num == 2)
                     {
                         send(new_socket,"Server 2 OK",11,0);
-                        pathname = "DFS2/"+sendfile.username + "/" + sendfile.nameoffile + ".";
+                        pathname = "DFS2/"+ subfoldername;
                         getfilehandler(pathname,sendfile, new_socket);
                     }
                     if (sendfile.server_num == 3)
                     {
                         send(new_socket,"Server 3 OK",11,0);
-                        pathname = "DFS3/"+sendfile.username + "/" + sendfile.nameoffile + ".";
+                        pathname = "DFS3/"+ subfoldername;
                         getfilehandler(pathname,sendfile, new_socket);
                     }
                     if (sendfile.server_num == 4)
                     {
                         send(new_socket,"Server 4 OK",11,0);
-                        pathname = "DFS4/"+sendfile.username + "/" + sendfile.nameoffile + "." ;
+                        pathname = "DFS4/"+ subfoldername;
                         getfilehandler(pathname,sendfile, new_socket);
                     }  
                     
@@ -214,28 +251,46 @@ int main(int argc, char const *argv[])
                 if (commandflag == 2)
                 {
                     int partno;
+                    string subfoldername;
+                    //string filestat;
+                    if(listfile.subfolder== ".")
+                    {
+                        subfoldername = listfile.username;
+                        send(new_socket,"DEFAULT",10,0);
+                       // cout << "IN HERE "<<  endl;
+                        
+                    }
+                    else
+                    {
+                        cout << "IN HERE NOW" << endl;
+                        subfoldername = listfile.username+ "/" + listfile.subfolder;
+                        if(!listsubfolder(new_socket,listfile))
+                        {
+                            return 0 ;
+                        }
+                    } 
                     if (listfile.server_num == 1)
                     {
                         send(new_socket,"Server 1 OK",15,0);
-                        pathname = "./DFS1/"+listfile.username;
+                        pathname = "./DFS1/"+subfoldername;
                         listfilehandler(pathname,listfile, new_socket);   
                     }
                     if (listfile.server_num == 2)
                     {
                         send(new_socket,"Server 2 OK",15,0);
-                        pathname = "./DFS2/"+listfile.username;
+                        pathname = "./DFS2/"+subfoldername;
                         listfilehandler(pathname,listfile, new_socket);
                     }
                     if (listfile.server_num == 3)
                     {
                         send(new_socket,"Server 3 OK",15,0);
-                        pathname = "./DFS3/"+listfile.username;
+                        pathname = "./DFS3/"+subfoldername;
                         listfilehandler(pathname,listfile, new_socket);
                     }
                     if (listfile.server_num == 4)
                     {
                         send(new_socket,"Server 4 OK",15,0);
-                        pathname = "./DFS4/"+listfile.username;
+                        pathname = "./DFS4/"+subfoldername;
                         listfilehandler(pathname,listfile, new_socket);
                         
                     } 

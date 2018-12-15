@@ -197,7 +197,7 @@ void getfilehandler(string pathname,send_packet_t sendfile, int sock)
             cout << "sendflag[1] : " <<sendflag[1] << endl;
         }
         sendbytes = 0;
-        cout << "before cases "<< endl;
+        //cout << "before cases "<< endl;
         if((sendflag[0] == 1) && (sendflag[1] == 1))
         {
             cout <<"case 1 " <<endl;
@@ -293,19 +293,6 @@ void getfilehandler(string pathname,send_packet_t sendfile, int sock)
                 printf("Error: %s and code %d\n", strerror( errno ), errno);    
             }   
         }
-        /*if(sendflag[1])
-        {
-            //sending part number
-            if ((sendbytes = send(sock,sendfile.file_part_data2.c_str(),sendfile.file_part_2_size,0)) < 0)
-            {
-                printf("Error: %s and code %d\n", strerror( errno ), errno);    
-            }
-            sendbytes = 0; //sending data
-            if ((sendbytes = send(sock,sendfile.file_part_data2.c_str(),sendfile.file_part_2_size,0)) < 0)
-            {
-                printf("Error: %s and code %d\n", strerror( errno ), errno);    
-            }
-        }*/
        
     }
 
@@ -320,8 +307,9 @@ void parse_infostring(string infostring, int commandflag)
         vector<string> getcommand = splitStrings(splitgetcomm[0], ',');
         sendfile.command = getcommand[0];
         sendfile.nameoffile = getcommand[1];
-        sendfile.server_num = stoi(getcommand[2]) + 1; 
-        sendfile.username = getcommand[3];
+        sendfile.subfolder = getcommand[2];
+        sendfile.server_num = stoi(getcommand[3]) + 1; 
+        sendfile.username = getcommand[4];
         cout << "command : " << sendfile.command << endl;
         cout << "name of file : " << sendfile.nameoffile << endl;
         cout << "Server No : " << sendfile.server_num << endl;
@@ -341,23 +329,25 @@ void parse_infostring(string infostring, int commandflag)
         filepart.password = element[2];
         filepart.command = element[0];
         filepart.nameoffile = element[4];
-        filepart.md5val = element[5];
-        filepart.file_part_1 = stoi(element[6]);
-        filepart.file_part_1_size = stoi(element[7]);
-        filepart.file_part_2 = stoi(element[8]);
-        filepart.file_part_2_size = stoi(element[9]);
+        filepart.subfolder = element[5];
+        filepart.md5val = element[6];
+        filepart.file_part_1 = stoi(element[7]);
+        filepart.file_part_1_size = stoi(element[8]);
+        filepart.file_part_2 = stoi(element[9]);
+        filepart.file_part_2_size = stoi(element[10]);
 
         cout << "value of structure  packet elements received " << endl;
         cout << "username : " << filepart.username << endl;
         cout << "password : " << filepart.password << endl;
         cout << "command : " << filepart.command << endl;
         cout << "name of file : " << filepart.nameoffile << endl;
+        cout << "subfolder : " << filepart.subfolder << endl;
         cout << "Server No : " << filepart.server_num << endl;
         cout << "md5val : " << filepart.md5val << endl;
         cout << "1st file part no from client : " << filepart.file_part_1 << endl;
         cout << "2nd file part no from client : " << filepart.file_part_2 << endl;
-        cout << "data in 1st file part no from client : " << filepart.file_part_data1 << endl;
-        cout << "data in 2nd file part no from client : " << filepart.file_part_data2 << endl;
+        //cout << "data in 1st file part no from client : " << filepart.file_part_data1 << endl;
+        //cout << "data in 2nd file part no from client : " << filepart.file_part_data2 << endl;
         cout << "size of 1st file part : " << filepart.file_part_1_size << endl;
         cout << "size of 2nd file part : " << filepart.file_part_2_size << endl;
     }
@@ -366,8 +356,9 @@ void parse_infostring(string infostring, int commandflag)
         vector<string> listelement = splitStrings(infostring, ','); 
         listfile.command = listelement[0];
         listfile.username = listelement[1];
-        listfile.password = listelement[2];
-        listfile.server_num = stoi(listelement[3]);
+        listfile.subfolder = listelement[2];
+        listfile.password = listelement[3];
+        listfile.server_num = stoi(listelement[4]);
 
     }
     if(commandflag == 3)
@@ -376,7 +367,7 @@ void parse_infostring(string infostring, int commandflag)
         mkdirfile.subfolder = mkdircom[1];
         mkdirfile.username = mkdircom[2];
         mkdirfile.server_num = stoi(mkdircom[3]) + 1;
-        cout << "server no : " << mkdirfile.server_num << endl;;
+        cout << "server no : " << mkdirfile.server_num << endl;
         cout << "username : " << mkdirfile.username << endl;
         cout << "subfolder : " << mkdirfile.subfolder<< endl;
     }
@@ -394,8 +385,10 @@ void listfilehandler(string pathname,list_packet_t listfile, int sock)
     DIR *dir;
     struct dirent *ent;
     cout << "pathname : " << pathname << endl;
+    
     if ((dir = opendir (pathname.c_str())) != NULL) 
     {
+        
         int i = 0;
         /* print all the files and directories within directory */
         while ((ent = readdir (dir)) != NULL)
@@ -403,16 +396,19 @@ void listfilehandler(string pathname,list_packet_t listfile, int sock)
             filename[i] = string(ent->d_name);
             i++;
             
+            
         }
+        
         closedir (dir);
+        cout <<"i is " << i << endl;
         for(int j = 0;j < i;j++)
         {
-            //cout << filename[j] << endl;
+            cout << filename[j] << endl;
             //cout << "list item  " << j << endl;
             if(filename[j].length() > 2)
             {
                 vector<string> name = splitStrings(filename[j], '.');
-               //cout << "name :" << name[0] << ", number :" << name[1]  << endl; 
+                //cout << "name :" << name[0] << ", number :" << name[1]  << endl; 
                 listfile.nameoffile = name[0];
                 listfile.filepart = stoi(name[1]);
                 listfile.completefilename = filename[j];
@@ -421,6 +417,7 @@ void listfilehandler(string pathname,list_packet_t listfile, int sock)
             }
             
         }
+        //cout << "IN HERE "<< endl;
         cout << "Sendlist: \n" << sendlist << endl;
         cout << "sendlist size : " <<sendlist.size() << endl;
         if(sendlist.size() == 0)
@@ -450,5 +447,106 @@ void listfilehandler(string pathname,list_packet_t listfile, int sock)
         perror ("");
     
     }           
+}
+int checksubfolder(int new_socket,received_packet_t filepart)
+{
+    string path1;
+    string subfolderlist;
+    DIR *dir;
+    struct dirent *ent;
+    path1 = "DFS" + std::to_string(filepart.server_num) +"/"+filepart.username;
+    cout << "path1: " <<path1 << endl;
+    if ((dir = opendir (path1.c_str())) != NULL) 
+    {
+        /* print all the files and directories within directory */
+        while ((ent = readdir (dir)) != NULL)
+        {
+            subfolderlist += string(ent->d_name) + ",";
+            printf("in while of check\n");
+            
+        }
+        closedir (dir);
+    }
+    cout << "subfolderlist  : " << subfolderlist << endl;
+    size_t found = subfolderlist.find(filepart.subfolder);
+    if (found!=std::string::npos)//found
+    {
+        send(new_socket,"FOUND",10,0);
+        cout <<  "Subfolder " << filepart.subfolder << " exists on server side " <<endl;
+        return 1;
+    }
+    else {
+        send(new_socket,"NOT FOUND",10,0);
+        cout <<  "Subfolder " << filepart.subfolder << " does not exists on server side " <<endl;
+        return 0;
+    }
+}
+
+int listsubfolder(int new_socket,list_packet_t listfile)
+{
+    string path1;
+    string subfolderlist;
+    DIR *dir;
+    struct dirent *ent;
+    path1 = "DFS" + std::to_string(listfile.server_num) +"/"+listfile.username;
+    cout << "path1: " <<path1 << endl;
+    if ((dir = opendir (path1.c_str())) != NULL) 
+    {
+        /* print all the files and directories within directory */
+        while ((ent = readdir (dir)) != NULL)
+        {
+            subfolderlist += string(ent->d_name) + ",";
+            //printf("in while of check\n");
+            
+        }
+        closedir (dir);
+    }
+    cout << "subfolderlist  : " << subfolderlist << endl;
+    size_t found = subfolderlist.find(listfile.subfolder);
+    if (found!=std::string::npos)//found
+    {
+        send(new_socket,"FOUND",10,0);
+        cout <<  "Subfolder " << listfile.subfolder << " exists on server side " <<endl;
+        return 1;
+    }
+    else {
+        send(new_socket,"NOT FOUND",10,0);
+        cout <<  "Subfolder " << listfile.subfolder << " does not exists on server side " <<endl;
+        return 0;
+    }
+}
+
+int getsubfolder(int new_socket,send_packet_t sendfile)
+{
+    string path1;
+    string subfolderlist;
+    DIR *dir;
+    struct dirent *ent;
+    path1 = "DFS" + std::to_string(sendfile.server_num) +"/"+sendfile.username;
+    cout << "path1: " <<path1 << endl;
+    if ((dir = opendir (path1.c_str())) != NULL) 
+    {
+        /* print all the files and directories within directory */
+        while ((ent = readdir (dir)) != NULL)
+        {
+            subfolderlist += string(ent->d_name) + ",";
+            //printf("in while of check\n");
+            
+        }
+        closedir (dir);
+    }
+    cout << "subfolderlist  : " << subfolderlist << endl;
+    size_t found = subfolderlist.find(sendfile.subfolder);
+    if (found!=std::string::npos)//found
+    {
+        send(new_socket,"FOUND",10,0);
+        cout <<  "Subfolder " << sendfile.subfolder << " exists on server side " <<endl;
+        return 1;
+    }
+    else {
+        send(new_socket,"NOT FOUND",10,0);
+        cout <<  "Subfolder " << sendfile.subfolder << " does not exists on server side " <<endl;
+        return 0;
+    }
 }
 
