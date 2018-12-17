@@ -4,6 +4,11 @@
         "iostream": "cpp",
         "future": "cpp",
         "system_error": "cpp",
-        "istream": "cpp"
+        "istream": "cpp",
+        "array": "cpp",
+        "bitset": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp",
+        "valarray": "cpp"
     }
 }

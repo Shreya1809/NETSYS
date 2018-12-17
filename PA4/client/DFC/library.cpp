@@ -359,7 +359,7 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no,int s
     {
         printf("--------#STATUS : %s\n",status);
         sendbytes = 0;
-        // string encrypted_data1 = encryptdecrypt(filepart.file_part_data1,"5");
+        filepart.file_part_data1 = encryptdecrypt(filepart.file_part_data1,"5");
         // size_t filesize = encrypted_data1.size();
         // const char *fileData = encrypted_data1.c_str();
         size_t filesize = filepart.file_part_data1.size();
@@ -385,7 +385,7 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no,int s
         }
 
         sendbytes = 0;
-        // string encrypted_data2 = encryptdecrypt(filepart.file_part_data2,"5");
+        filepart.file_part_data2 = encryptdecrypt(filepart.file_part_data2,"5");
         // filesize = encrypted_data2.size();
         // fileData = encrypted_data2.c_str();
         filesize = filepart.file_part_data2.size();

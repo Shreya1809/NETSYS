@@ -127,16 +127,17 @@ int main(int argc, char const *argv[])
                 printf("%d,%d,%d,%d\n",part[0],part[1],part[2],part[3]);
                 if(fp!=NULL)
                 {
-                    string decryptedmesg = getfile.file_part_data[0] +
-                                            getfile.file_part_data[1] +
-                                            getfile.file_part_data[2] +
-                                            getfile.file_part_data[3];
-                    // for(int j = 0;j < 4;j++)
-                    // {
-                    //     //cout << "Data [" << j << "] : " << getfile.file_part_data[j] << endl ;
-                    //     // decryptedmesg += encryptdecrypt((getfile.file_part_data[j]),"5");
-                    //     decryptedmesg += getfile.file_part_data[j];
-                    // }
+                    // string decryptedmesg = getfile.file_part_data[0] +
+                    //                         getfile.file_part_data[1] +
+                    //                         getfile.file_part_data[2] +
+                    //                         getfile.file_part_data[3];
+                    string decryptedmesg;
+                    for(int j = 0;j < 4;j++)
+                    {
+                        //cout << "Data [" << j << "] : " << getfile.file_part_data[j] << endl ;
+                        decryptedmesg += encryptdecrypt((getfile.file_part_data[j]),"5");
+                        // decryptedmesg += getfile.file_part_data[j];
+                    }
                     fwrite(decryptedmesg.c_str(),decryptedmesg.size(),1,fp);
                     fclose(fp);
                 }
