@@ -359,15 +359,54 @@ void ClientPutCommandHandler(file_packet_t filepart,int sock,int server_no,int s
     {
         printf("--------#STATUS : %s\n",status);
         sendbytes = 0;
-        string encrypted_data1 = encryptdecrypt(filepart.file_part_data1,"5");
-        if ((sendbytes = send(sock,encrypted_data1.c_str(),filepart.file_part_size[filepart.file_part_1],0)) < 0)
-        {
-            printf("Error: %s and code %d\n", strerror( errno ), errno);    
+        // string encrypted_data1 = encryptdecrypt(filepart.file_part_data1,"5");
+        // size_t filesize = encrypted_data1.size();
+        // const char *fileData = encrypted_data1.c_str();
+        size_t filesize = filepart.file_part_data1.size();
+        const char *fileData =filepart.file_part_data1.c_str();
+        uint32_t retry = 0;
+        while(filesize){
+            size_t n = filesize > 10240? 10240 : filesize;
+            sendbytes = send(sock,fileData,n,0);
+            if(sendbytes <0){
+                printf("Error: %s and code %d\n", strerror( errno ), errno); 
+                if(retry < 10){
+                    retry++; 
+                }
+                else{
+                    return; 
+                }  
+            }
+            else{
+                filesize = filesize - sendbytes;
+                printf("File bytes remainig:%d/%d\n",filesize,filepart.file_part_data1.size());
+                fileData += sendbytes;
+            }
         }
-        string encrypted_data2 = encryptdecrypt(filepart.file_part_data2,"5");
-        if ((sendbytes = send(sock,encrypted_data2.c_str(),filepart.file_part_size[filepart.file_part_2],0)) < 0)
-        {
-            printf("Error: %s and code %d\n", strerror( errno ), errno);    
+
+        sendbytes = 0;
+        // string encrypted_data2 = encryptdecrypt(filepart.file_part_data2,"5");
+        // filesize = encrypted_data2.size();
+        // fileData = encrypted_data2.c_str();
+        filesize = filepart.file_part_data2.size();
+        fileData =filepart.file_part_data2.c_str();
+        while(filesize){
+            size_t n = filesize > 10240? 10240 : filesize;
+            sendbytes = send(sock,fileData,n,0);
+            if(sendbytes <0){
+                printf("Error: %s and code %d\n", strerror( errno ), errno); 
+                if(retry < 10){
+                    retry++; 
+                }
+                else{
+                    return; 
+                }
+            }
+            else{
+                filesize = filesize - sendbytes;
+                printf("File bytes remainig:%d/%d\n",filesize,filepart.file_part_data1.size());
+                fileData += sendbytes;
+            }
         }
     }
     
@@ -472,8 +511,8 @@ void ClientGetCommandHandler(string filename, string subfolder,file_packet_t fil
     int receiveflagmesg =0;
     int receiveflagsize =0;
     //cout 
-    cout << "size of 1st file part : " << datasize1 << endl;
-    cout << "size of 2nd file part : " << datasize2 << endl;
+    //cout << "size of 1st file part : " << datasize1 << endl;
+    //cout << "size of 2nd file part : " << datasize2 << endl;
     if((datasize1 == 0) && (datasize2 == 0))
     {
         return;
@@ -562,28 +601,59 @@ void ClientGetCommandHandler(string filename, string subfolder,file_packet_t fil
     if((receiveflagmesg == 1) &&(receiveflagsize == 1))
     {
         int rbytes = 0;
+        int readpart = 0;
         char datapart1[getfile.file_part_1_size] = {0};
         char datapart2[getfile.file_part_2_size] = {0};
-        if ((rbytes =read(sock,datapart1,sizeof(datapart1))) < 0 )
-        {
-            printf("rbytes : %d\n",rbytes);
-
+        //cout << "size of datapart 1 buffer : " << getfile.file_part_1_size << endl;
+        //cout << "size of datapart 2 buffer : " << getfile.file_part_2_size << endl;
+        size_t arbytes = 0;
+        while(arbytes < getfile.file_part_1_size){
+            if ((rbytes =read(sock,&datapart1[arbytes],getfile.file_part_1_size-arbytes)) < 0 )
+            {
+                printf("ERR: rbytes : %d\n",rbytes);
+            }
+            else{
+                printf("Recv:rbytes : %d\n",rbytes);
+                arbytes += rbytes;
+            }
         }
-        getfile.file_part_data[getfile.file_part_1] = string(datapart1,sizeof(datapart1));
+        printf("Exp: %d, Arbytes : %d\n",getfile.file_part_1_size, arbytes);
+        getfile.file_part_data[getfile.file_part_1] = string(datapart1,getfile.file_part_1_size);
+        rbytes = 0;
+        arbytes = 0;
         //else  cout << " data part : " << getfile.file_part_1<<  "\n data: " << datapart1 <<endl;
-        if ((rbytes =read(sock,datapart2,sizeof(datapart2))) < 0 )
-        {
-            printf("rbytes : %d\n",rbytes);
-            
+        while(arbytes < getfile.file_part_2_size){
+            if ((rbytes =read(sock,&datapart2[arbytes],getfile.file_part_2_size-arbytes)) < 0 )
+            {
+                printf("ERR: rbytes : %d\n",rbytes);
+            }
+            else{
+                printf("Recv:rbytes : %d\n",rbytes);
+                arbytes += rbytes;
+            }
         }
-        getfile.file_part_data[getfile.file_part_2] = string(datapart2,sizeof(datapart2));
+        printf("Exp: %d, Arbytes : %d\n",getfile.file_part_2_size, arbytes);
+        getfile.file_part_data[getfile.file_part_2] = string(datapart2,getfile.file_part_2_size);
         //else cout << " data part : " << getfile.file_part_2<<  "\n data: " << datapart2 <<endl;
     }
     else if((receiveflagmesg == 0) &&(receiveflagsize == 0))
     {
+        int rbytes = 0;
         char datapart1[getfile.file_part_1_size] = {0};
-        read(sock,datapart1,sizeof(datapart1));
-        getfile.file_part_data[getfile.file_part_1] = string(datapart1,sizeof(datapart1));
+        cout << "size of datapart 1 buffer : " << getfile.file_part_1_size << endl;
+        size_t arbytes = 0;
+        while(arbytes < getfile.file_part_1_size){
+            if ((rbytes =read(sock,&datapart1[arbytes],getfile.file_part_1_size-arbytes)) < 0 )
+            {
+                printf("ERR: rbytes : %d\n",rbytes);
+            }
+            else{
+                printf("Recv:rbytes : %d\n",rbytes);
+                arbytes += rbytes;
+            }
+        }
+        printf("Exp: %d, Arbytes : %d\n",getfile.file_part_1_size, arbytes);
+        getfile.file_part_data[getfile.file_part_1] = string(datapart1,getfile.file_part_1_size);
         //cout << " data part : " << getfile.file_part_1<<  "\n data: " << datapart1 <<endl;
         //printf(" data part :%d \n data: %s\n",getfile.file_part_1,datapart1);
     }

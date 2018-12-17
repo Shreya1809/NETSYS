@@ -185,23 +185,51 @@ int main(int argc, char const *argv[])
                         send(new_socket,"Server 4 OK",15,0);
                         pathname = "DFS4/"+filepart.username + subfoldername;
                     }
-                    timeout = {2,0};
-				    setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
-                    read(new_socket,file_part_data1 ,sizeof(file_part_data1));
-                    timeout = {2,0};
-				    setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
-                    read(new_socket,file_part_data2 ,sizeof(file_part_data2));
-                    printf("data file part 1: %s\n",file_part_data1);
-                    printf("data file part 2: %s\n",file_part_data2);
-                    printf("username : %s\n",filepart.username.c_str());
+                    // timeout = {2,0};
+				    // setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
+                    // read(new_socket,file_part_data1 ,sizeof(file_part_data1));
+                    size_t arbytes = 0;
+                    int rbytes = 0;
+                    while(arbytes < sizeof(file_part_data1)){
+                        if ((rbytes =read(new_socket,&file_part_data1[arbytes],sizeof(file_part_data1)-arbytes)) < 0 )
+                        {
+                            printf("ERR: rbytes : %d\n",rbytes);
+                        }
+                        else{
+                            printf("Recv:rbytes : %d\n",rbytes);
+                            arbytes += rbytes;
+                        }
+                    }
+                    printf("Exp: %d, Arbytes : %d\n",sizeof(file_part_data1), arbytes);
+
+
+                    // timeout = {2,0};
+				    // setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
+                    // read(new_socket,file_part_data2 ,sizeof(file_part_data2));
+                    arbytes = 0;
+                    rbytes = 0;
+                    while(arbytes < sizeof(file_part_data2)){
+                        if ((rbytes =read(new_socket,&file_part_data2[arbytes],sizeof(file_part_data2)-arbytes)) < 0 )
+                        {
+                            printf("ERR: rbytes : %d\n",rbytes);
+                        }
+                        else{
+                            printf("Recv:rbytes : %d\n",rbytes);
+                            arbytes += rbytes;
+                        }
+                    }
+                    printf("Exp: %d, Arbytes : %d\n",sizeof(file_part_data2), arbytes);
+                    // printf("data file part 1: %s\n",file_part_data1);
+                    // printf("data file part 2: %s\n",file_part_data2);
+                    // printf("username : %s\n",filepart.username.c_str());
                     string filepartname1 = pathname + filepart.nameoffile + "."+ std::to_string(filepart.file_part_1);
                     string filepartname2 = pathname + filepart.nameoffile + "."+ std::to_string(filepart.file_part_2);
                     //cout << filepartname1 << endl;
                     fp1 = fopen(filepartname1.c_str(),"wb");
                     fp2 = fopen(filepartname2.c_str(),"wb");
                     fwrite(file_part_data1 , 1 , sizeof(file_part_data1) , fp1 );
-                    fwrite(file_part_data2 , 1 , sizeof(file_part_data2) , fp2 );
                     fclose(fp1);
+                    fwrite(file_part_data2 , 1 , sizeof(file_part_data2) , fp2 );
                     fclose(fp2);
                     memset(file_part_data1,0,sizeof(file_part_data1));
                     memset(file_part_data2,0,sizeof(file_part_data2));

@@ -262,38 +262,133 @@ void getfilehandler(string pathname,send_packet_t sendfile, int sock)
             printf("rbytes : %d\n",rbytes);
 
         }
-        //sending data to client
+        cout << "sending data to client .... " << endl;
         struct timeval timeout = {0,5000};
 		setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout,sizeof(struct timeval));
+        int sendpartno = 0;
         if(caseflag == 1)
         {
-            cout << "Sending to client part :" << sendfile.file_part_1 << "\n data :" << sendfile.file_part_data[sendfile.file_part_1] << endl;
-            if ((sendbytes = send(sock,sendfile.file_part_data[sendfile.file_part_1].c_str(),sendfile.file_part_1_size,0)) < 0)
+
+            //sending part 1
+            size_t filesize = sendfile.file_part_1_size;
+            const char *fileData = sendfile.file_part_data[sendfile.file_part_1].c_str();
+            uint32_t retry = 0;
+            while(filesize){
+                size_t n = filesize > 1024? 1024 : filesize;
+                sendbytes = send(sock,fileData,n,0);
+                if(sendbytes <0){
+                    printf("Error: %s and code %d\n", strerror( errno ), errno); 
+                    if(retry < 10){
+                        retry++; 
+                    }
+                    else{
+                        printf("Retry overflow. Returninng.\n");
+                        return; 
+                    }  
+                }
+                else{
+                    filesize = filesize - sendbytes;
+                    fileData += sendbytes;
+                }
+            }
+            printf("File bytes remainig:%d/%d\n",filesize,sendfile.file_part_1_size);
+            //sending part 2
+            sendbytes = 0;
+            filesize = sendfile.file_part_2_size;
+            fileData = sendfile.file_part_data[sendfile.file_part_2].c_str();
+            retry = 0;
+            while(filesize){
+                size_t n = filesize > 1024? 1024 : filesize;
+                sendbytes = send(sock,fileData,n,0);
+                if(sendbytes <0){
+                    printf("Error: %s and code %d\n", strerror( errno ), errno); 
+                    if(retry < 10){
+                        retry++; 
+                    }
+                    else{
+                        printf("Retry overflow. Returninng.\n");
+                        return; 
+                    }  
+                }
+                else{
+                    filesize = filesize - sendbytes;
+                    fileData += sendbytes;
+                }
+            }
+            printf("File bytes remainig:%d/%d\n",filesize,sendfile.file_part_2_size);
+            /*if ((sendbytes = send(sock,sendfile.file_part_data[sendfile.file_part_1].c_str(),sendfile.file_part_1_size,0)) < 0)
             {
                 printf("Error: %s and code %d\n", strerror( errno ), errno);    
             }
             sendbytes = 0;
-            cout << "Sending to client part :" << sendfile.file_part_2 << "\n data :" << sendfile.file_part_data[sendfile.file_part_2] << endl;
+            //cout << "Sending to client part :" << sendfile.file_part_2 << "\n data :" << sendfile.file_part_data[sendfile.file_part_2] << endl;
             if ((sendbytes = send(sock,sendfile.file_part_data[sendfile.file_part_2].c_str(),sendfile.file_part_2_size,0)) < 0)
             {
                 printf("Error: %s and code %d\n", strerror( errno ), errno);    
-            }
+            }*/
+            
         }
         sendbytes = 0;
         if(caseflag == 2)
         {
-            if ((sendbytes = send(sock,sendfile.file_part_data[sendfile.file_part_1].c_str(),sendfile.file_part_1_size,0)) < 0)
+            /*if ((sendbytes = send(sock,sendfile.file_part_data[sendfile.file_part_1].c_str(),sendfile.file_part_1_size,0)) < 0)
             {
                 printf("Error: %s and code %d\n", strerror( errno ), errno);    
-            }   
+            }*/  
+            int sendbytes = 0;
+            size_t filesize = sendfile.file_part_1_size;
+            const char *fileData = sendfile.file_part_data[sendfile.file_part_1].c_str();
+            uint32_t retry = 0;
+            while(filesize){
+                size_t n = filesize > 1024? 1024 : filesize;
+                sendbytes = send(sock,fileData,n,0);
+                if(sendbytes <0){
+                    printf("Error: %s and code %d\n", strerror( errno ), errno); 
+                    if(retry < 10){
+                        retry++; 
+                    }
+                    else{
+                        printf("Retry overflow. Returninng.\n");
+                        return; 
+                    }  
+                }
+                else{
+                    filesize = filesize - sendbytes;
+                    fileData += sendbytes;
+                }
+            } 
+            printf("File bytes remainig:%d/%d\n",filesize,sendfile.file_part_1_size);
         }
         sendbytes = 0;
         if(caseflag == 3)
         {
-            if ((sendbytes = send(sock,sendfile.file_part_data[sendfile.file_part_2].c_str(),sendfile.file_part_2_size,0)) < 0)
+            /*if ((sendbytes = send(sock,sendfile.file_part_data[sendfile.file_part_2].c_str(),sendfile.file_part_2_size,0)) < 0)
             {
                 printf("Error: %s and code %d\n", strerror( errno ), errno);    
-            }   
+            }*/ 
+            int sendbytes = 0;
+            size_t filesize = sendfile.file_part_2_size;
+            const char *fileData = sendfile.file_part_data[sendfile.file_part_2].c_str();
+            uint32_t retry = 0;
+            while(filesize){
+                size_t n = filesize > 1024? 1024 : filesize;
+                sendbytes = send(sock,fileData,n,0);
+                if(sendbytes <0){
+                    printf("Error: %s and code %d\n", strerror( errno ), errno); 
+                    if(retry < 10){
+                        retry++; 
+                    }
+                    else{
+                        printf("Retry overflow. Returninng.\n");
+                        return; 
+                    }  
+                }
+                else{
+                    filesize = filesize - sendbytes;
+                    fileData += sendbytes;
+                }
+            } 
+            printf("File bytes remainig:%d/%d\n",filesize,sendfile.file_part_2_size);  
         }
        
     }

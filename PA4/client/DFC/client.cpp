@@ -103,6 +103,7 @@ int main(int argc, char const *argv[])
             part[2]=0;
             part[3]=0;
             printf("Command Entered is GET and filename is %s\n",entered_option[1].c_str());
+            // getfile = {0};
             for(int a = 0; a <4; a++)
             {
                 ClientGetCommandHandler(entered_option[1], entered_option[2],filepart,sock[a],a,socketfailflag[a]);
@@ -126,12 +127,17 @@ int main(int argc, char const *argv[])
                 printf("%d,%d,%d,%d\n",part[0],part[1],part[2],part[3]);
                 if(fp!=NULL)
                 {
-                    for(int j = 0;j < 4;j++)
-                    {
-                        //cout << "Data [" << j << "] : " << getfile.file_part_data[j] << endl ;
-                        string decryptedmesg = encryptdecrypt((getfile.file_part_data[j]),"5");
-                        fwrite(decryptedmesg.c_str(),(getfile.file_part_data[j]).size(),1,fp);
-                    }
+                    string decryptedmesg = getfile.file_part_data[0] +
+                                            getfile.file_part_data[1] +
+                                            getfile.file_part_data[2] +
+                                            getfile.file_part_data[3];
+                    // for(int j = 0;j < 4;j++)
+                    // {
+                    //     //cout << "Data [" << j << "] : " << getfile.file_part_data[j] << endl ;
+                    //     // decryptedmesg += encryptdecrypt((getfile.file_part_data[j]),"5");
+                    //     decryptedmesg += getfile.file_part_data[j];
+                    // }
+                    fwrite(decryptedmesg.c_str(),decryptedmesg.size(),1,fp);
                     fclose(fp);
                 }
                 else
